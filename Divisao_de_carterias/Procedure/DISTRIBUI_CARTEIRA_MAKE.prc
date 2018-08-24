@@ -1,8 +1,8 @@
 CREATE OR REPLACE PROCEDURE TOTALPRD."DISTRIBUI_CARTEIRA_MAKE" (
-       P_CODUSU NUMBER,        -- C√≥digo do usu√°rio logado
-       P_IDSESSAO VARCHAR2,    -- Identificador da execu√ß√£o. Serve para buscar informa√ß√µes dos par√¢metros/campos da execu√ß√£o.
-       P_QTDLINHAS NUMBER,     -- Informa a quantidade de registros selecionados no momento da execu√ß√£o.
-       P_MENSAGEM OUT VARCHAR2 -- Caso seja passada uma mensagem aqui, ela ser√° exibida como uma informa√ß√£o ao usu√°rio.
+       P_CODUSU NUMBER,        -- CÛdigo do usu·rio logado
+       P_IDSESSAO VARCHAR2,    -- Identificador da execuÁ„o. Serve para buscar informaÁıes dos par‚metros/campos da execuÁ„o.
+       P_QTDLINHAS NUMBER,     -- Informa a quantidade de registros selecionados no momento da execuÁ„o.
+       P_MENSAGEM OUT VARCHAR2 -- Caso seja passada uma mensagem aqui, ela ser· exibida como uma informaÁ„o ao usu·rio.
 ) AS
        PARAM_PCODREG VARCHAR2(10);
        PARAM_PTIPONOVO CHAR;
@@ -20,19 +20,20 @@ CREATE OR REPLACE PROCEDURE TOTALPRD."DISTRIBUI_CARTEIRA_MAKE" (
 BEGIN
 /*
     AUTOR: Mauricio Rodrigues
-    Data da cria√ß√£o: 16/08/2018
-    Descri√ß√£o: Divis√£o de carterias da distribui√ß√£o, com base nos parceiros da curva abs + regi√µes + ativos/inativos/novos.
+    Data da criaÁ„o: 16/08/2018
+    DescriÁ„o: Divis„o de carterias da distribuiÁ„o, com base nos parceiros da curva abs + regiıes + ativos/inativos/novos.
+	teste
 */
 --A TRIGGER ABAIXO IMPEDE DE ATUALIZAR O PARCEIRO CASO O CADASTRO ESTEJA ERRADO.
 EXECUTE IMMEDIATE 'ALTER TRIGGER TOTALPRD.TRG_UPD_TGFPAR_TOTAL DISABLE';
 
-       -- Os valores informados pelo formul√°rio de par√¢metros, podem ser obtidos com as fun√ß√µes:
+       -- Os valores informados pelo formul·rio de par‚metros, podem ser obtidos com as funÁıes:
        --     ACT_INT_PARAM
        --     ACT_DEC_PARAM
        --     ACT_TXT_PARAM
        --     ACT_DTA_PARAM
-       -- Estas fun√ß√µes recebem 2 argumentos:
-       --     ID DA SESS√ÉO - Identificador da execu√ß√£o (Obtido atrav√©s de P_IDSESSAO))
+       -- Estas funÁıes recebem 2 argumentos:
+       --     ID DA SESS√O - Identificador da execuÁ„o (Obtido atravÈs de P_IDSESSAO))
        --     NOME DO PARAMETRO - Determina qual parametro deve se deseja obter.
 
        PARAM_PCODREG := ACT_TXT_PARAM(P_IDSESSAO, 'PCODREG');
@@ -44,7 +45,7 @@ EXECUTE IMMEDIATE 'ALTER TRIGGER TOTALPRD.TRG_UPD_TGFPAR_TOTAL DISABLE';
        PARAM_PNAOCODVEND := NVL(ACT_TXT_PARAM(P_IDSESSAO, 'PNAOCODVEND'), '23534639');
     
 IF (PARAM_PTIPONOVO = 'N') AND (PARAM_PTIPOINATIVO = 'N') AND (PARAM_PTIPOATIVO = 'N') THEN
-    TEXTMSG := 'Nenhuma op√ß√£o marcada!';
+    TEXTMSG := 'Nenhuma opÁ„o marcada!';
 ELSE
        SELECT MAX(RESTOR) + 1 
        INTO PK_RESTOR
@@ -101,7 +102,7 @@ ELSE
                             ORDER BY SEQUENCIA))
             LOOP
                 IF PASSA = PINATIVO.SEQUENCIA THEN
---              INSERE UM LOG DAS MUDAN√áAS --SELECT MAX(RESTOR) + 1 FROM AD_LOGDISTCARTEIRA
+--              INSERE UM LOG DAS MUDAN«AS --SELECT MAX(RESTOR) + 1 FROM AD_LOGDISTCARTEIRA
                     INSERT INTO AD_LOGDISTCARTEIRA (ID, DTHRALTER, CODPARC, CODVENDANTIGO, CODVENDNOVO, CODUSU, TIPO, CODREG, RESTOR) 
                          VALUES ((SELECT MAX(ID) +1 FROM AD_LOGDISTCARTEIRA), SYSDATE, PINATIVO.CODPARC, PINATIVO.CODVEND, FIELD_CODVEND, P_CODUSU, 'I', PINATIVO.REG, PK_RESTOR);
  
@@ -166,7 +167,7 @@ ELSE
                             ORDER BY SEQUENCIA))
             LOOP
                 IF PASSA = PATIVO.SEQUENCIA THEN
---              INSERE UM LOG DAS MUDAN√áAS --SELECT * DELETE FROM AD_LOGDISTCARTEIRA
+--              INSERE UM LOG DAS MUDAN«AS --SELECT * DELETE FROM AD_LOGDISTCARTEIRA
                     INSERT INTO AD_LOGDISTCARTEIRA (ID, DTHRALTER, CODPARC, CODVENDANTIGO, CODVENDNOVO, CODUSU, TIPO, CODREG, RESTOR) 
                          VALUES ((SELECT MAX(ID) +1 FROM AD_LOGDISTCARTEIRA), SYSDATE, PATIVO.CODPARC, PATIVO.CODVEND, FIELD_CODVEND, P_CODUSU, 'A', PATIVO.REG, PK_RESTOR);
  
@@ -209,7 +210,7 @@ ELSE
             
                 IF PASSA = PNOVO.SEQUENCIA THEN 
                 
-    --              INSERE UM LOG DAS MUDAN√áAS --SELECT * FROM AD_LOGDISTCARTEIRA
+    --              INSERE UM LOG DAS MUDAN«AS --SELECT * FROM AD_LOGDISTCARTEIRA
                     INSERT INTO AD_LOGDISTCARTEIRA (ID, DTHRALTER, CODPARC, CODVENDANTIGO, CODVENDNOVO, CODUSU, TIPO, CODREG, RESTOR) 
                          VALUES ((SELECT MAX(ID) +1 FROM AD_LOGDISTCARTEIRA), SYSDATE, PNOVO.CODPARC, PNOVO.CODVEND, FIELD_CODVEND, P_CODUSU, 'N', PNOVO.REG, PK_RESTOR);
  
