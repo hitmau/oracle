@@ -22,7 +22,7 @@ BEGIN
     AUTOR: Mauricio Rodrigues
     Data da criação: 16/08/2018
     Descrição: Divisão de carterias da distribuição, com base nos parceiros da curva abs + regiões + ativos/inativos/novos.
-	teste
+	teste testelkajsdlfk asdf 
 */
 --A TRIGGER ABAIXO IMPEDE DE ATUALIZAR O PARCEIRO CASO O CADASTRO ESTEJA ERRADO.
 EXECUTE IMMEDIATE 'ALTER TRIGGER TOTALPRD.TRG_UPD_TGFPAR_TOTAL DISABLE';
