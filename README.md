@@ -1,2 +1,0 @@
-# oracle
-Minhas consultas
