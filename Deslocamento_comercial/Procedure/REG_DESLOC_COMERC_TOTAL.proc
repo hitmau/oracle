@@ -1,0 +1,99 @@
+CREATE OR REPLACE PROCEDURE TOTALPRD."REG_DESLOC_COMERC_TOTAL" (
+       P_CODUSU NUMBER,        -- Código do usuário logado
+       P_IDSESSAO VARCHAR2,    -- Identificador da execução. Serve para buscar informações dos parâmetros/campos da execução.
+       P_QTDLINHAS NUMBER,     -- Informa a quantidade de registros selecionados no momento da execução.
+       P_MENSAGEM OUT VARCHAR2 -- Caso seja passada uma mensagem aqui, ela será exibida como uma informação ao usuário.
+) AS
+       FIELD_CODPAP NUMBER;
+       PCODUSU INT;
+       ADATA DATE;
+       PX INT;
+       PID INT;
+       PIDPAP INT;
+       CONT INT;
+       PLOG VARCHAR(400);
+BEGIN
+
+       -- Os valores informados pelo formulário de parâmetros, podem ser obtidos com as funções:
+       --     ACT_INT_PARAM
+       --     ACT_DEC_PARAM
+       --     ACT_TXT_PARAM
+       --     ACT_DTA_PARAM
+       -- Estas funções recebem 2 argumentos:
+       --     ID DA SESSÃO - Identificador da execução (Obtido através de P_IDSESSAO))
+       --     NOME DO PARAMETRO - Determina qual parametro deve se deseja obter.
+        SELECT STP_GET_CODUSULOGADO() INTO PCODUSU FROM DUAL;
+        
+                ADATA := ACT_DTA_PARAM(P_IDSESSAO,'PDATA');
+        
+        SELECT COUNT(*)
+        INTO PX 
+        FROM AD_DESLOCCOMERCIAL AD 
+        WHERE TRUNC(AD.DIAVISITA) = TRUNC(ADATA) 
+          AND AD.CODUSU = PCODUSU;
+        
+        IF PX = 0 THEN
+            INSERT INTO AD_DESLOCCOMERCIAL (ID, CODUSU, DTHRATUAL, DIAVISITA) VALUES ((SELECT MAX(ID) + 1 FROM AD_DESLOCCOMERCIAL), PCODUSU, SYSDATE, ADATA);
+        END IF;
+        
+        SELECT MAX(ID) 
+            INTO PID
+            FROM AD_DESLOCCOMERCIAL AD
+            WHERE TRUNC(AD.DIAVISITA) = TRUNC(ADATA) 
+                AND AD.CODUSU = PCODUSU;
+
+       FOR I IN 1..P_QTDLINHAS -- Este loop permite obter o valor de campos dos registros envolvidos na execução.
+       LOOP                    -- A variável "I" representa o registro corrente.
+           -- Para obter o valor dos campos utilize uma das seguintes funções:
+           --     ACT_INT_FIELD (Retorna o valor de um campo tipo NUMÉRICO INTEIRO))
+           --     ACT_DEC_FIELD (Retorna o valor de um campo tipo NUMÉRICO DECIMAL))
+           --     ACT_TXT_FIELD (Retorna o valor de um campo tipo TEXTO),
+           --     ACT_DTA_FIELD (Retorna o valor de um campo tipo DATA)
+           -- Estas funções recebem 3 argumentos:
+           --     ID DA SESSÃO - Identificador da execução (Obtido através do parâmetro P_IDSESSAO))
+           --     NÚMERO DA LINHA - Relativo a qual linha selecionada.
+           --     NOME DO CAMPO - Determina qual campo deve ser obtido.
+           FIELD_CODPAP := ACT_INT_FIELD(P_IDSESSAO, I, 'CODPAP');
+           
+           FOR I IN (SELECT AD.ID, AD.IDPAP, AD.CODPAP FROM AD_DESLOCPROSPECT AD WHERE AD.ID = PID)
+           LOOP
+                IF FIELD_CODPAP = I.CODPAP THEN
+                    PLOG := 'Parceiro ' || to_char(FIELD_CODPAP) || ' re-gravado ';
+                    
+                    DELETE FROM AD_DESLOCPROSPECT AD 
+                    WHERE AD.CODPAP = I.CODPAP
+                        AND AD.ID = I.ID 
+                        AND AD.IDPAP = I.IDPAP;
+                END IF;
+           END LOOP;           
+
+        SELECT COUNT(*)
+        INTO CONT
+        FROM AD_DESLOCPROSPECT
+        WHERE ID = PID;
+        
+        SELECT MAX(IDPAP) + 1
+        INTO PIDPAP
+        FROM AD_DESLOCPROSPECT
+        WHERE ID = PID;
+    --RAISE_APPLICATION_ERROR(-20101, '----------------00000000000000000000000000000000 NEW (' || TO_CHAR(:NEW.ID) || ') 00000000000000000  (' || TO_CHAR(AID) || ') KDJSKDFK (' || TO_CHAR(AIDPAP)  || ')');
+
+    
+--        IF AID = 0 THEN
+--            INSERT INTO AD_DESLOCPROSPECT (ID, IDPAP, CODPAP) VALUES (1, 1, I.CODPAP);
+--        ELSE
+        
+            IF CONT = 0 THEN
+                INSERT INTO AD_DESLOCPROSPECT (ID, IDPAP, CODPAP) VALUES (PID, 1, FIELD_CODPAP);
+                
+            ELSE
+                INSERT INTO AD_DESLOCPROSPECT (ID, IDPAP, CODPAP) VALUES (PID, PIDPAP, FIELD_CODPAP);   
+            END IF;
+
+
+       END LOOP;
+
+
+    P_MENSAGEM := 'Número do deslocamento gerado: ' || to_char(PID) || '.<br>' || TO_CHAR(PLOG) || '.';
+END;
+/
