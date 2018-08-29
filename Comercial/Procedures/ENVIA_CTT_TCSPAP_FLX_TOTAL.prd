@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE TOTALTST."ENVIA_CTT_TCSPAP_FLX_TOTAL" (
+CREATE OR REPLACE PROCEDURE TOTALPRD."ENVIA_CTT_TCSPAP_FLX_TOTAL" (
        P_CODUSU NUMBER,        -- Código do usuário logado
        P_IDSESSAO VARCHAR2,    -- Identificador da execução. Serve para buscar informações dos parâmetros/campos da execução.
        P_QTDLINHAS NUMBER,     -- Informa a quantidade de registros selecionados no momento da execução.
@@ -106,11 +106,11 @@ SELECT STP_GET_CODUSULOGADO() INTO PCODUSU FROM DUAL;
         
                                 IF PDTHRCONTATO < SYSDATE THEN
                     RAISE_APPLICATION_ERROR(-20101, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
-                    A data de nutrição para este prospect não pode ser menor que a data atual! (' || to_char(PDTHRCONTATO) || ')</font></b><br><font>');	
+                    A data de nutrição para este prospect não pode ser menor que a data atual! (' || to_char(PDTHRCONTATO) || ')</font></b><br><font>');    
                                 END IF;
                                 IF PCONTATO <= 0 THEN
                     RAISE_APPLICATION_ERROR(-20101, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
-                    Contato do Prospect não identificado!</font></b><br><font>');	
+                    Contato do Prospect não identificado!</font></b><br><font>');    
                                 END IF;
                 
                         IF SYSDATE < PDTHRCONTATO THEN
@@ -165,11 +165,11 @@ SELECT STP_GET_CODUSULOGADO() INTO PCODUSU FROM DUAL;
         
                                 IF PDTHRCONTATO < SYSDATE THEN
                     RAISE_APPLICATION_ERROR(-20101, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
-                    A data de Spin-SP para este prospect não pode ser menor que a data atual! (' || to_char(PDTHRCONTATO) || ')</font></b><br><font>');	
+                    A data de Spin-SP para este prospect não pode ser menor que a data atual! (' || to_char(PDTHRCONTATO) || ')</font></b><br><font>');    
                                 END IF;
                                 IF PCONTATO <= 0 THEN
                     RAISE_APPLICATION_ERROR(-20101, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
-                    Contato do Prospect não identificado!</font></b><br><font>');	
+                    Contato do Prospect não identificado!</font></b><br><font>');    
                                 END IF;
                 
                         IF SYSDATE < PDTHRCONTATO THEN
