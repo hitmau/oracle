@@ -1,0 +1,74 @@
+DROP TRIGGER TOTALPRD.TRG_INC_TCSOSE_M_TOTAL;
+
+CREATE OR REPLACE TRIGGER TOTALPRD.TRG_INC_TCSOSE_M_TOTAL
+BEFORE INSERT OR UPDATE ON TOTALPRD.TCSOSE
+FOR EACH ROW
+DECLARE
+   PCODUSU          INT;
+   PCONT         INT;
+   PCODVEND      INT;
+   PCODSERV      INT;
+   PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+/*
+    AUTOR: Mauricio Rodrigues
+    Data da criação: 13/12/2017
+    DESCRIÇÃO: significando que apenas eles tem o poder de concluir a negociação.
+
+*/
+--USUÁRIO LOGADO
+SELECT  STP_GET_CODUSULOGADO() 
+    INTO PCODUSU  
+    FROM DUAL;
+--VERIFICA SE CAMPO ESTÁ MARCADO
+SELECT COUNT(1) 
+    INTO PCONT 
+    FROM TSIUSU 
+    WHERE CODUSU = PCODUSU AND NVL(AD_ALTPROSPECT,'N') = 'S';
+--VENDEDOR ATRELADO AO USUÁRIO    
+SELECT CODVEND 
+    INTO PCODVEND 
+    FROM TSIUSU 
+    WHERE CODUSU = PCODUSU;
+
+--SUBERVISOR PODE ALTERAR O PROSPECT (USUÁRIO>GERAL>PODE ALTERAR PROSPECT)
+IF :NEW.TIPO = 'P' THEN --VERIFICA SE É NEGOCIAÇÃO
+    IF INSERTING THEN
+        UPDATE TCSPAP PAP SET PAP.AD_MQL = 'S',
+                              PAP.AD_SQL = 'S', 
+                              PAP.AD_PAPVALIDO = 'S', 
+                              PAP.AD_FLUXOLEAD = 4, 
+                              AD_ATIVIDADESFLUXO = 7 
+        WHERE PAP.CODPAP = :NEW.CODPAP;
+        COMMIT;
+    END IF;
+    IF (UPDATING) THEN 
+        
+        SELECT CODSERV
+        INTO PCODSERV
+        FROM TCSOSE OSE INNER JOIN TCSITE ITE ON (OSE.NUMOS=ITE.NUMOS)
+        WHERE ITE.NUMITEM = (SELECT MAX(I.NUMITEM) FROM TCSITE I WHERE I.NUMOS = OSE.NUMOS)
+            AND OSE.NUMOS = :NEW.NUMOS;
+            
+        IF (:NEW.SITUACAO = 'F') AND (:OLD.SITUACAO <> :NEW.SITUACAO) THEN
+            IF PCODSERV = 90003 THEN
+                UPDATE TCSPAP PAP SET PAP.AD_MQL = 'S',PAP.AD_SQL = 'S', PAP.AD_PAPVALIDO = 'S', PAP.AD_FLUXOLEAD = 6 WHERE PAP.CODPAP = :NEW.CODPAP;
+                COMMIT;
+            ELSE
+                UPDATE TCSPAP PAP SET PAP.AD_MQL = 'S',PAP.AD_SQL = 'N', PAP.AD_PAPVALIDO = 'S', PAP.AD_FLUXOLEAD = 5 WHERE PAP.CODPAP = :NEW.CODPAP;
+                COMMIT;
+            END IF;
+        END IF;
+    END IF;
+    
+    IF :OLD.CODVEND <> 0 THEN
+        IF (UPDATING) AND PCONT = 0 THEN
+            IF PCODVEND <> :OLD.CODVEND THEN
+    RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
+    Somente o(a) dono(a) da negociação pode alterar seu cabeçalho.</font></b><br><font>');
+            END IF;
+        END IF;
+    END IF;
+END IF;
+END;
+/
