@@ -1,0 +1,212 @@
+CREATE OR REPLACE PROCEDURE TOTALPRD."ENVIA_CTT_TGFPAR_FLX_TOTAL" (
+       P_CODUSU NUMBER,        -- Código do usuário logado
+       P_IDSESSAO VARCHAR2,    -- Identificador da execução. Serve para buscar informações dos parâmetros/campos da execução.
+       P_QTDLINHAS NUMBER,     -- Informa a quantidade de registros selecionados no momento da execução.
+       P_MENSAGEM OUT VARCHAR2 -- Caso seja passada uma mensagem aqui, ela será exibida como uma informação ao usuário.
+
+) AS
+       PAGENDAMKT VARCHAR(2);
+       FIELD_CODPAP NUMBER;
+       FIELD_CODCONTATO NUMBER;
+       PID INT;
+       PPAP INT;
+       pguarda VARCHAR(1000);
+       PEMAIL VARCHAR(100);
+       PCODUSU INT;
+       PIDENTIFICADOR INT;
+       POPORTUNIDADE CHAR(1);
+       PNOMECONTATO VARCHAR(100);
+       PCOUNT INT := 0;
+       PBR VARCHAR(10);
+       PCTTND VARCHAR(100);
+       PCTTNDECISOR VARCHAR(50);
+       PCOUNTDEL INT;
+       PDTHRCONTATO DATE;
+       PMOTREMOVE VARCHAR(5);
+       PNUREL INT;
+       VSEQUENCIA INT;
+       PCONTATO INT;
+       PNOMEPAP VARCHAR(50);
+       
+BEGIN
+
+SELECT STP_GET_CODUSULOGADO() INTO PCODUSU FROM DUAL;        
+
+        PIDENTIFICADOR := ACT_INT_PARAM(P_IDSESSAO, 'IDMASC');
+        POPORTUNIDADE := ACT_TXT_PARAM(P_IDSESSAO, 'OPORTUNIDADE');
+        PAGENDAMKT := ACT_TXT_PARAM(P_IDSESSAO, 'AGENDAMKT');
+        PDTHRCONTATO := ACT_DTA_PARAM(P_IDSESSAO, 'DTHRCONTATO');
+        PMOTREMOVE := ACT_TXT_PARAM(P_IDSESSAO, 'MOTREMOVE');
+        
+       FOR I IN 1..P_QTDLINHAS -- Este loop permite obter o valor de campos dos registros envolvidos na execução.
+       LOOP                    -- A variável "I" representa o registro corrente.
+          
+           FIELD_CODPAP := ACT_INT_FIELD(P_IDSESSAO, I, 'CODPAP');
+           FIELD_CODCONTATO := ACT_INT_FIELD(P_IDSESSAO, I, 'CODCONTATO');
+           
+            SELECT CTT.NOMECONTATO, CTT.AD_CTTNDECISOR, CTT.EMAIL, CTT.AD_CTTNDECISOR, (SELECT P.NOMEPAP FROM TCSPAP P WHERE P.CODPAP =  FIELD_CODPAP)
+            INTO PNOMECONTATO, PCTTNDECISOR, PEMAIL, PCTTND, PNOMEPAP
+            FROM TCSCTT CTT
+            WHERE CTT.CODPAP = FIELD_CODPAP AND CODCONTATO = FIELD_CODCONTATO;
+            
+               IF PEMAIL IS NULL OR PCTTND IS NULL THEN
+                    PGUARDA := PGUARDA || 'Contato ' || to_char(PNOMECONTATO) || ' não tem e-mail ou não tem contato não decisor! <br>';
+               ELSE
+                    IF PAGENDAMKT = 'I' THEN
+                        INSERT INTO AD_CONVMKTDIGITAL (ID, CODPAP, DTHRINTFLUXO, CODUSU, ENVIO, OPORTUNIDADE, IDMASC, REMOVER, IDCTT, CTTNDECISOR, AGENDAMKT) VALUES
+                        ((SELECT MAX(ID)+1 FROM AD_CONVMKTDIGITAL), FIELD_CODPAP, SYSDATE, PCODUSU, 'N', POPORTUNIDADE, PIDENTIFICADOR, 'N', FIELD_CODCONTATO, PCTTNDECISOR , 'I');
+                        PCOUNT := PCOUNT +1;
+                    ELSIF PAGENDAMKT = 'R' THEN
+                    --REMOVENDO --------------------------------------------------------------------------------------------------------------------
+                    if PIDENTIFICADOR is null then
+                        INSERT INTO AD_CONVMKTDIGITAL (ID, CODPAP, DTHRINTFLUXO, CODUSU, ENVIO, OPORTUNIDADE, IDMASC, REMOVER, IDCTT, CTTNDECISOR, AGENDAMKT, DTHRREMOVIDO) VALUES
+                        ((SELECT MAX(ID)+1 FROM AD_CONVMKTDIGITAL), FIELD_CODPAP, SYSDATE, PCODUSU, 'N', POPORTUNIDADE, PIDENTIFICADOR, 'N', FIELD_CODCONTATO, PCTTNDECISOR , 'R', SYSDATE);
+                    end if;
+                        PCOUNT := PCOUNT +1;
+                        
+                        SELECT COUNT(*) 
+                        INTO PCOUNTDEL 
+                        FROM TGFTEL 
+                        WHERE AD_CODPAP = FIELD_CODPAP AND AD_CODCONTATO = FIELD_CODCONTATO AND DHPROXCHAM >= SYSDATE AND AD_REGMKTDIGITAL = 'S';
+                        
+                        DELETE FROM TGFTEL WHERE AD_CODPAP = FIELD_CODPAP AND AD_CODCONTATO = FIELD_CODCONTATO AND DHPROXCHAM >= SYSDATE AND AD_REGMKTDIGITAL = 'S';
+                        DELETE FROM AD_AGENDAPAP WHERE CODPAP = FIELD_CODPAP AND CODCONTATO = FIELD_CODCONTATO AND DATAHORAAGENDAMENTO >= SYSDATE;
+                
+                        PGUARDA := PGUARDA || 'Contato ' || to_char(PNOMECONTATO) || ' com ' || to_char(PCOUNTDEL) || ' registro(s) removido(s) da agenda! <br>';
+                        
+                       IF PMOTREMOVE = 'N' AND PDTHRCONTATO IS NOT NULL THEN
+                       -------------------------------------------------------------------------------------------------------------------------------------------
+               
+                            ------///
+                            EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_TCSPAP_M_TOTAL DISABLE';
+                            EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_TGFTEL_M_TOTAL DISABLE';
+                            EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_AD_AGENDAPAP_M_TOTAL DISABLE';
+                                
+                            UPDATE TCSPAP PAP SET 
+                                PAP.AD_NUTRIMKTP = 'S',
+                                PAP.AD_DTHRPROSNUTRICAO = PDTHRCONTATO,
+                                PAP.AD_MQL = 'N',
+                                PAP.AD_SQL = 'N',
+                                PAP.AD_FLUXOLEAD = 5,
+                                AD_ATIVIDADESFLUXO = 7
+                            WHERE PAP.CODPAP = FIELD_CODPAP; COMMIT;
+
+
+                                SELECT COUNT(*)
+                                INTO VSEQUENCIA
+                                FROM AD_AGENDAPAP PAP
+                                WHERE PAP.CODPAP = FIELD_CODPAP;
+                             
+                                SELECT MAX(NUREL) +1 INTO PNUREL FROM TGFTEL;
+                                
+                                SELECT COUNT(*)
+                                INTO PCONTATO
+                                FROM TCSCTT CTT
+                                WHERE CTT.CODPAP = FIELD_CODPAP;
+        
+                                IF PDTHRCONTATO < SYSDATE THEN
+                    RAISE_APPLICATION_ERROR(-20101, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
+                    A data de nutrição para este prospect não pode ser menor que a data atual! (' || to_char(PDTHRCONTATO) || ')</font></b><br><font>');    
+                                END IF;
+                                IF PCONTATO <= 0 THEN
+                    RAISE_APPLICATION_ERROR(-20101, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
+                    Contato do Prospect não identificado!</font></b><br><font>');    
+                                END IF;
+                
+                        IF SYSDATE < PDTHRCONTATO THEN
+                            DELETE FROM TGFTEL TEL WHERE FIELD_CODPAP = TEL.AD_CODPAP AND SYSDATE < TEL.DHPROXCHAM AND TEL.PENDENTE = 'S';
+                        END IF;
+                        
+                        IF VSEQUENCIA <> 0 THEN
+                            Insert into TGFTEL (NUREL, CODPARC, DHCHAMADA, COMENTARIOS, DHPROXCHAM, PENDENTE, CODUSU, SITUACAO, CODATENDENTE, DTALTER, AD_CODPAP, AD_CODCONTATO, AD_FALLOWUP) Values
+                            (PNUREL, 1, SYSDATE, TO_CHAR(FIELD_CODPAP) || ' - ' || TO_CHAR(PNOMEPAP) || ': Agenda gerada automaticamente, Nutrição.', PDTHRCONTATO, 'S', PCODUSU, 'P', PCODUSU, SYSDATE, FIELD_CODPAP, FIELD_CODCONTATO, 'N');
+                            commit;
+                            
+                            Insert into AD_AGENDAPAP (CODNUREL, CODPAP, SEQ, ATENDENTE, CODCONTATO, DATAHORACADASTRO, DATAHORAAGENDAMENTO, SITUACAO, COMENTARIO, CODUSUEXEC, AD_FALLOWUP)
+                            VALUES (PNUREL, FIELD_CODPAP, (SELECT MAX(AD.SEQ)+1 FROM AD_AGENDAPAP AD WHERE AD.CODPAP = FIELD_CODPAP), PCODUSU, FIELD_CODCONTATO, SYSDATE, PDTHRCONTATO, 'S', TO_CHAR(FIELD_CODPAP) || ' - ' || TO_CHAR(PNOMEPAP) || ': Agenda gerada automaticamente, Nutrição.', PCODUSU, 'N');
+                            COMMIT;
+                        ELSE
+                            Insert into TGFTEL (NUREL, CODPARC, DHCHAMADA, COMENTARIOS, DHPROXCHAM, PENDENTE, CODUSU, SITUACAO, CODATENDENTE, DTALTER, AD_CODPAP, AD_CODCONTATO, AD_FALLOWUP) Values
+                            (PNUREL, 1, SYSDATE, TO_CHAR(FIELD_CODPAP) || ' - ' || TO_CHAR(PNOMEPAP) || ': Agenda gerada automaticamente, Nutrição.', PDTHRCONTATO, 'S', PCODUSU, 'P', PCODUSU, SYSDATE, FIELD_CODPAP, FIELD_CODCONTATO, 'N');
+                            commit;
+                        
+                            Insert into AD_AGENDAPAP (CODNUREL, CODPAP, SEQ, ATENDENTE, CODCONTATO, DATAHORACADASTRO, DATAHORAAGENDAMENTO, SITUACAO, COMENTARIO, CODUSUEXEC, AD_FALLOWUP)
+                            VALUES (PNUREL, FIELD_CODPAP, 1, PCODUSU, FIELD_CODCONTATO, SYSDATE, PDTHRCONTATO, 'S', TO_CHAR(FIELD_CODPAP) || ' - ' || TO_CHAR(PNOMEPAP) || ': Agenda gerada automaticamente, Nutrição.', PCODUSU, 'N');
+                            COMMIT;
+                        END IF;
+    EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_TGFTEL_M_TOTAL ENABLE';
+    EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_AD_AGENDAPAP_M_TOTAL ENABLE'; 
+    EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_TCSPAP_M_TOTAL ENABLE';                             
+                            -----//
+                            
+                        
+                            PGUARDA := PGUARDA || 'Contato ' || to_char(PNOMECONTATO) || ' com (1) registro gravados na agenda, para Ligação em: ' || to_char(PDTHRCONTATO) || '! <br>';    
+                    -------------------------------------------------------------------------------------------------------------------------------------------    
+                    ELSIF PMOTREMOVE = 'S' AND PDTHRCONTATO IS NOT NULL THEN
+                        
+                            UPDATE TCSPAP PAP SET PAP.AD_MQL = 'S', PAP.AD_PAPVALIDO = 'S', PAP.AD_ATIVIDADESFLUXO = 8, PAP.AD_FLUXOLEAD = 3 WHERE PAP.CODPAP = FIELD_CODPAP;
+                            -----------------
+                            EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_TGFTEL_M_TOTAL DISABLE';
+                            EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_AD_AGENDAPAP_M_TOTAL DISABLE';
+
+
+
+                                SELECT COUNT(*)
+                                INTO VSEQUENCIA
+                                FROM AD_AGENDAPAP PAP
+                                WHERE PAP.CODPAP = FIELD_CODPAP;
+                             
+                                SELECT MAX(NUREL) +1 INTO PNUREL FROM TGFTEL;
+                                
+                                SELECT COUNT(*)
+                                INTO PCONTATO
+                                FROM TCSCTT CTT
+                                WHERE CTT.CODPAP = FIELD_CODPAP;
+        
+                                IF PDTHRCONTATO < SYSDATE THEN
+                    RAISE_APPLICATION_ERROR(-20101, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
+                    A data de Spin-SP para este prospect não pode ser menor que a data atual! (' || to_char(PDTHRCONTATO) || ')</font></b><br><font>');    
+                                END IF;
+                                IF PCONTATO <= 0 THEN
+                    RAISE_APPLICATION_ERROR(-20101, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#FF0000">
+                    Contato do Prospect não identificado!</font></b><br><font>');    
+                                END IF;
+                
+                        IF SYSDATE < PDTHRCONTATO THEN
+                            DELETE FROM TGFTEL TEL WHERE FIELD_CODPAP = TEL.AD_CODPAP AND SYSDATE < TEL.DHPROXCHAM AND TEL.PENDENTE = 'S';
+                        END IF;
+                        
+                        IF VSEQUENCIA <> 0 THEN
+                            Insert into TGFTEL (NUREL, CODPARC, DHCHAMADA, COMENTARIOS, DHPROXCHAM, PENDENTE, CODUSU, SITUACAO, CODATENDENTE, DTALTER, AD_CODPAP, AD_CODCONTATO, AD_FALLOWUP) Values
+                            (PNUREL, 1, SYSDATE, TO_CHAR(FIELD_CODPAP) || ' - ' || TO_CHAR(PNOMEPAP) || ': Agenda gerada automaticamente, Spin-SP.', PDTHRCONTATO, 'S', PCODUSU, 'P', PCODUSU, SYSDATE, FIELD_CODPAP, FIELD_CODCONTATO, 'SP');
+                            commit;
+                            
+                            Insert into AD_AGENDAPAP (CODNUREL, CODPAP, SEQ, ATENDENTE, CODCONTATO, DATAHORACADASTRO, DATAHORAAGENDAMENTO, SITUACAO, COMENTARIO, CODUSUEXEC, AD_FALLOWUP)
+                            VALUES (PNUREL, FIELD_CODPAP, (SELECT MAX(AD.SEQ)+1 FROM AD_AGENDAPAP AD WHERE AD.CODPAP = FIELD_CODPAP), PCODUSU, FIELD_CODCONTATO, SYSDATE, PDTHRCONTATO, 'S', TO_CHAR(FIELD_CODPAP) || ' - ' || TO_CHAR(PNOMEPAP) || ': Agenda gerada automaticamente, Spin-SP.', PCODUSU, 'SP');
+                            COMMIT;
+                        ELSE
+                            Insert into TGFTEL (NUREL, CODPARC, DHCHAMADA, COMENTARIOS, DHPROXCHAM, PENDENTE, CODUSU, SITUACAO, CODATENDENTE, DTALTER, AD_CODPAP, AD_CODCONTATO, AD_FALLOWUP) Values
+                            (PNUREL, 1, SYSDATE, TO_CHAR(FIELD_CODPAP) || ' - ' || TO_CHAR(PNOMEPAP) || ': Agenda gerada automaticamente, Spin-SP.', PDTHRCONTATO, 'S', PCODUSU, 'P', PCODUSU, SYSDATE, FIELD_CODPAP, FIELD_CODCONTATO, 'SP');
+                            commit;
+                        
+                            Insert into AD_AGENDAPAP (CODNUREL, CODPAP, SEQ, ATENDENTE, CODCONTATO, DATAHORACADASTRO, DATAHORAAGENDAMENTO, SITUACAO, COMENTARIO, CODUSUEXEC, AD_FALLOWUP)
+                            VALUES (PNUREL, FIELD_CODPAP, 1, PCODUSU, FIELD_CODCONTATO, SYSDATE, PDTHRCONTATO, 'S', TO_CHAR(FIELD_CODPAP) || ' - ' || TO_CHAR(PNOMEPAP) || ': Agenda gerada automaticamente, Spin-SP.', PCODUSU, 'SP');
+                            COMMIT;
+                        END IF;
+    EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_TGFTEL_M_TOTAL ENABLE';
+    EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_INC_AD_AGENDAPAP_M_TOTAL ENABLE';                        
+                            -----------------
+                           END IF;
+                    ELSE
+                        INSERT INTO AD_CONVMKTDIGITAL (ID, CODPAP, DTHRINTFLUXO, CODUSU, ENVIO, OPORTUNIDADE, IDMASC, REMOVER, IDCTT, CTTNDECISOR, AGENDAMKT) VALUES
+                        ((SELECT MAX(ID)+1 FROM AD_CONVMKTDIGITAL), FIELD_CODPAP, SYSDATE, PCODUSU, 'N', POPORTUNIDADE, PIDENTIFICADOR, 'N', FIELD_CODCONTATO, PCTTNDECISOR, 'N');
+                        PCOUNT := PCOUNT +1; 
+                    END IF;   
+               END IF;
+                
+--           END IF;
+      END LOOP;
+    PBR := '<br>';
+   P_MENSAGEM  := 'Foram enviados (' || to_char(PCOUNT) || ') contatos para o fluxo.' || PBR || PGUARDA;
+END;
+/
