@@ -50,6 +50,7 @@ BEGIN
             PID := PID + 1;
             PFIM2 := 1;
         ELSIF PVLR_ALV IS NULL THEN
+            PID := PID - 1;
             PFIM := 1;
             PFIM2 := 0;
         ELSE
@@ -67,6 +68,8 @@ BEGIN
                 P_TOTAL := PVLR_MET;
             ELSIF P_VouM = 0 THEN
                 P_TOTAL := PVLR_EMP;
+            ELSIF P_VouM = 2 THEN
+                P_TOTAL := PID;
             END IF;
             PFIM2 := 0;
         END IF;
