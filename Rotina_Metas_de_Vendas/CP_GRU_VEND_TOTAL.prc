@@ -104,7 +104,7 @@ BEGIN
 --                                          GROUP BY AD.ID)));
 
 
-                FOR IGRU IN (SELECT GRUPO, TOTALZAO, ROUND(TOTAL,2) AS TOTAL, 10 AS PERC
+                FOR IGRU IN (SELECT GRUPO, TOTALZAO, TOTAL, 10 AS PERC
                             FROM (
                                   SELECT ADA.CODGRUPOPROD AS GRUPO,
                                   ---TOTALZAO
@@ -266,18 +266,14 @@ BEGIN
                             (FIELD_ID, PK_GRUPO, (SELECT MAX(IDMETDIA) + 1 FROM AD_GRUPOSPRODUSUDIA AD WHERE AD.ID = FIELD_ID AND AD.IDGRU = PK_GRUPO), IGRU2.GRUPO, IGRU2.TOTAL,10, IGRU2.PER, ((IGRU2.TOTAL/100)* 10)+IGRU2.TOTAL, IGRU2.FATUR); 
                         END IF;
                         
+                        --Verifica se existe registro de data
                         SELECT COUNT(IDGRUMETDIAS)
                         INTO CONT2
                         FROM AD_GRUMETDIAS
-                        WHERE IDGRUMETDIAS = IGRU2.FATUR;
---
-                        IF CONT2 < 1 THEN
---                            SELECT NVL(IDGRUMETDIAS, SYSDATE)
---                            INTO PDATA_PK
---                            FROM AD_GRUMETDIAS
---                            WHERE IDGRUMETDIAS = IGRU2.FATUR;
-
---                            IF PDATA_PK <> IGRU2.FATUR THEN
+                        WHERE id = FIELD_ID and IDGRUMETDIAS = IGRU2.FATUR; --'02/09/2018'
+--SELECT * FRO
+                        IF CONT2 = 0 THEN
+                                --insere nova data
                                 INSERT INTO AD_GRUMETDIAS (ID, IDGRUMETDIAS, METAGRUDIA, CODGRUPOPROD) VALUES (FIELD_ID, IGRU2.FATUR,IGRU.TOTAL, IGRU.GRUPO); --IGRU.TOTAL
                                 
                                 SELECT COUNT(*)
@@ -361,7 +357,7 @@ BEGIN
         ELSE
             DELETE FROM AD_GRUPOSPRODUSUDIA WHERE ID = FIELD_ID;
         
-            FOR IUPDATE IN (SELECT GRUPO, TOTALZAO, ROUND(TOTAL,2) AS TOTAL , ROUND(PERC,2) AS PERC , ((TOTAL*PERC)/100)+TOTAL AS SUGESTAO
+            FOR IUPDATE IN (SELECT GRUPO, TOTALZAO, TOTAL , PERC , ((TOTAL*PERC)/100)+TOTAL AS SUGESTAO
 
                                 FROM (
                                       SELECT ADA.CODGRUPOPROD AS GRUPO,
@@ -500,10 +496,10 @@ BEGIN
 
                         IF CONTDIAS = 0 THEN
                             INSERT INTO AD_GRUPOSPRODUSUDIA (ID, IDGRU,IDMETDIA, CODGRUPOPROD, DIAANOANT, PERCRES,PESO, METADIA, DATA) VALUES
-                            (FIELD_ID, PK_GRUPO,1, IGRU2.GRUPO, IGRU2.TOTAL, IGRU2.PER,10, ((IGRU2.TOTAL/100)* IGRU2.PER)+IGRU2.TOTAL, IGRU2.FATUR);
+                            (FIELD_ID, PK_GRUPO,1, IGRU2.GRUPO, IGRU2.TOTAL, IGRU2.PER,10, ((IGRU2.TOTAL/100)* 10)+IGRU2.TOTAL, IGRU2.FATUR);
                         ELSE
                             INSERT INTO AD_GRUPOSPRODUSUDIA (ID, IDGRU,IDMETDIA, CODGRUPOPROD, DIAANOANT, PERCRES,PESO, METADIA,DATA) VALUES
-                            (FIELD_ID, PK_GRUPO, (SELECT MAX(IDMETDIA) + 1 FROM AD_GRUPOSPRODUSUDIA AD WHERE AD.ID = FIELD_ID AND AD.IDGRU = PK_GRUPO), IGRU2.GRUPO, IGRU2.TOTAL, IGRU2.PER,10, ((IGRU2.TOTAL/100)* IGRU2.PER)+IGRU2.TOTAL, IGRU2.FATUR);
+                            (FIELD_ID, PK_GRUPO, (SELECT MAX(IDMETDIA) + 1 FROM AD_GRUPOSPRODUSUDIA AD WHERE AD.ID = FIELD_ID AND AD.IDGRU = PK_GRUPO), IGRU2.GRUPO, IGRU2.TOTAL, IGRU2.PER,10, ((IGRU2.TOTAL/100)* 10)+IGRU2.TOTAL, IGRU2.FATUR);
                         END IF;
                     END LOOP;    
             END LOOP;
@@ -514,7 +510,7 @@ BEGIN
         FOR IUPDATE IN (SELECT CODVEND
                           , VALOR
                           , TOTAL
-                          , ROUND((VALOR/TOTAL)*100,4) AS PERC 
+                          , (VALOR/TOTAL)*100 AS PERC 
                      FROM (
                            SELECT VEN.CODVEND
                                         , NVL((SELECT SUM( ((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI) * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV )
@@ -560,8 +556,8 @@ BEGIN
             
             FOR IVEND IN (SELECT CODVEND
                                , VALOR
-                               , ROUND(TOTAL,2) AS TOTAL
-                               , ROUND((VALOR/TOTAL)*100, 2) AS PERC 
+                               , TOTAL AS TOTAL
+                               , (VALOR/TOTAL)*100 AS PERC 
                           FROM (
                                 SELECT VEN.CODVEND
                                      , NVL((SELECT SUM( ((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI) * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV )
@@ -630,9 +626,9 @@ BEGIN
                     DELETE FROM  AD_GRUPROSPRODMETVEN A WHERE A.ID = FIELD_ID AND NVL(A.CODGRUPO, PARAM_CODGRU) = PARAM_CODGRU;
                
             FOR IVEND IN (SELECT CODVEND, APELIDO
-                               , ROUND(TOTAL,2) AS TOTAL
+                               , TOTAL AS TOTAL
                                , VALOR
-                               , ROUND((VALOR/TOTAL)*100,2) AS PERC 
+                               , (VALOR/TOTAL)*100 AS PERC 
                           FROM (
                                 SELECT VEN.CODVEND
                                      , VEN.APELIDO
@@ -706,26 +702,31 @@ BEGIN
         WHERE A.ID = FIELD_ID;
         
         DELETE
+        FROM AD_SUBGRUPOVENDMETDIAS A
+        WHERE A.ID = FIELD_ID;
+        
+        DELETE
         FROM AD_SUBGRUPOVENDMET AD
         WHERE AD.ID = FIELD_ID;
           
         IF CONT = 0 THEN --VERIFICA SE EXISTE VENDEDORES
             PMSG := PMSG || 'Sem vendedor cadastrado na tela.<br>';
         ELSE
-            FOR IVEN IN (SELECT VEN.IDMETVEND, VEN.CODVEND, ROUND(VEN.PERCVEND,2) AS PERC 
+            FOR IVEN IN (SELECT VEN.IDMETVEND, VEN.CODVEND, VEN.PERCVEND AS PERC 
                           FROM AD_GRUPROSPROD A LEFT JOIN AD_GRUPROSPRODMETVEN VEN ON (A.ID=VEN.ID)--VENDEDORES
-                          WHERE A.ID = 23--FIELD_ID --
+                          WHERE A.ID = FIELD_ID
                           ORDER BY 2)
             LOOP
-                FOR IGRU IN (SELECT GRU.CODGRUPOPROD AS GRUPO, ROUND(GRU.SUGESTAO,2) AS SUGESTAO
+                --Busca pelos grupos
+                FOR IGRU IN (SELECT GRU.CODGRUPOPROD AS GRUPO, GRU.SUGESTAO AS SUGESTAO
                               FROM AD_GRUPROSPROD A LEFT JOIN AD_GRUPOSPRODUSU GRU ON (A.ID=GRU.ID)--GRUPOS
-                              WHERE A.ID = 23--FIELD_ID --15
+                              WHERE A.ID = FIELD_ID
                               ORDER BY 2)
                 LOOP
                     SELECT COUNT(*)
                     INTO CONTGRU
                     FROM AD_SUBGRUPOVENDMET AD
-                    WHERE AD.ID = FIELD_ID--
+                    WHERE AD.ID = FIELD_ID
                       AND AD.IDMETVEND = IVEN.IDMETVEND;
                 
                     IF CONTGRU = 0 THEN
@@ -736,40 +737,50 @@ BEGIN
                         (FIELD_ID, IVEN.IDMETVEND, (SELECT MAX(IDSUBVENDMETA) + 1 FROM AD_SUBGRUPOVENDMET A WHERE A.ID = FIELD_ID AND A.IDMETVEND = IVEN.IDMETVEND), IGRU.GRUPO, ((IGRU.SUGESTAO * IVEN.PERC)/100));
                     END IF;
                 END LOOP;
+                --Fim da busca pelos grupos
                 --FOR PARA METAS POR DIA DO VENDEDOR
-                FOR IVENDIA IN (SELECT GR.ID, GR.CODGRUPOPROD, GM.DATA, GM.METADIA 
+                FOR IVENDIA IN (SELECT GR.ID, GR.CODGRUPOPROD
+                                     , CASE WHEN TO_CHAR(TO_DATE(TO_CHAR(GM.DATA, 'DD/MM/') || TO_CHAR(SYSDATE, 'YYYY'),'DD/MM/YYYY'), 'd') = 7
+                                            THEN TO_DATE(TO_CHAR(GM.DATA, 'DD/MM/') || TO_CHAR(SYSDATE, 'YYYY'),'DD/MM/YYYY') + 2
+                                            ELSE CASE WHEN TO_CHAR(TO_DATE(TO_CHAR(GM.DATA, 'DD/MM/') || TO_CHAR(SYSDATE, 'YYYY'),'DD/MM/YYYY'), 'd') = 1
+                                                      THEN TO_DATE(TO_CHAR(GM.DATA, 'DD/MM/') || TO_CHAR(SYSDATE, 'YYYY'),'DD/MM/YYYY') + 1
+                                                      ELSE TO_DATE(TO_CHAR(GM.DATA, 'DD/MM/') || TO_CHAR(SYSDATE, 'YYYY'),'DD/MM/YYYY')
+                                                 END
+                                       END AS DATA
+                                     , GM.METADIA AS METADIA
+                                     , VEN.IDMETVEND, VEN.CODVEND
+                                     , VEN.PERCVEND AS PERCVEND
+                                     , GM.IDMETDIA
+                                     , ((GM.METADIA/100) * VEN.PERCVEND) AS PERC
                                 FROM AD_GRUPOSPRODUSU GR INNER JOIN AD_GRUPOSPRODUSUDIA GM ON (GR.ID = GM.ID AND GR.IDGRU = GM.IDGRU)
-                                WHERE GR.ID = FIELD_ID--23
-                                ORDER BY DATA)
+                                                         LEFT  JOIN AD_GRUPROSPRODMETVEN VEN ON (GR.ID = VEN.ID)
+                                WHERE GR.ID = FIELD_ID
+                                  AND VEN.IDMETVEND = IVEN.IDMETVEND
+                                ORDER BY GR.DATA)
                 LOOP
                  
                 SELECT COUNT(*) 
                 INTO CONT2
-                FROM AD_SUBGRUPOVENDMETDIAS 
-                WHERE ID = FIELD_ID
-                  AND IDMETVEND = IVEN.IDMETVEND;  
-                
-                --PPDATA DATE
-                --INTDATA INT
-
-                
-
+                FROM AD_SUBGRUPOVENDMETDIAS A 
+                WHERE A.ID = FIELD_ID
+                  AND A.IDMETVEND = IVEN.IDMETVEND;
+                  
                 IF CONT2 = 0 THEN
                     INSERT INTO AD_SUBGRUPOVENDMETDIAS (ID, IDMETVEND, IDGRUVENDDIAS, CODGRUPOPROD, SUGMETVENDDIA, DATA, CODVEND) VALUES
-                    (FIELD_ID, IVEN.IDMETVEND, 1, IVENDIA.CODGRUPOPROD, (IVENDIA.METADIA-((IVENDIA.METADIA/100)*IVEN.PERC)), IVENDIA.DATA, IVEN.CODVEND);
-                ELSE
-                    SELECT MAX(IDGRUVENDDIAS) + 1 
-                    INTO PK_GRUPO
-                    FROM AD_SUBGRUPOVENDMETDIAS 
-                    WHERE ID = FIELD_ID
-                      AND IDMETVEND = IVEN.IDMETVEND; 
+                    (FIELD_ID, IVENDIA.IDMETVEND, 1, IVENDIA.CODGRUPOPROD,IVENDIA.PERC, IVENDIA.DATA, IVENDIA.CODVEND);
                 
-                     INSERT INTO AD_SUBGRUPOVENDMETDIAS (ID, IDMETVEND, IDGRUVENDDIAS, CODGRUPOPROD, SUGMETVENDDIA, DATA, CODVEND) VALUES
-                    (FIELD_ID, IVEN.IDMETVEND, PK_GRUPO, IVENDIA.CODGRUPOPROD, (IVENDIA.METADIA-((IVENDIA.METADIA/100)*IVEN.PERC)), IVENDIA.DATA, IVEN.CODVEND);
-                END IF;
+                ELSE
+                    
+                    SELECT MAX(A.IDGRUVENDDIAS) + 1 
+                    INTO PK_GRUPO
+                    FROM AD_SUBGRUPOVENDMETDIAS A
+                    WHERE ID = FIELD_ID
+                      AND A.IDMETVEND = IVENDIA.IDMETVEND;
+                            
+                            INSERT INTO AD_SUBGRUPOVENDMETDIAS (ID, IDMETVEND, IDGRUVENDDIAS, CODGRUPOPROD, SUGMETVENDDIA, DATA, CODVEND) VALUES
+                            (FIELD_ID, IVENDIA.IDMETVEND, PK_GRUPO, IVENDIA.CODGRUPOPROD, IVENDIA.PERC, IVENDIA.DATA, IVENDIA.CODVEND);
+                        END IF;
                 END LOOP;
-                --FIM DO FOR DE METAS POR DIA DO VENDEDOR
-            
             END LOOP;
         END IF; --VERIFICA SE EXISTE VENDEDORES
     END IF;
