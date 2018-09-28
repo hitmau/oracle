@@ -489,10 +489,10 @@ BEGIN
 
                         IF CONTDIAS = 0 THEN
                             INSERT INTO AD_GRUPOSPRODUSUDIA (ID, IDGRU,IDMETDIA, CODGRUPOPROD, DIAANOANT, PERCRES,PESO, METADIA, DATA) VALUES
-                            (FIELD_ID, PK_GRUPO,1, IGRU2.GRUPO, IGRU2.TOTAL, IGRU2.PER,10, ((IGRU2.TOTAL/100)* 10)+IGRU2.TOTAL, IGRU2.FATUR);
+                            (FIELD_ID, PK_GRUPO,1, IGRU2.GRUPO, IGRU2.TOTAL, IGRU2.PER,IUPDATE.PERC , ((IGRU2.TOTAL/100)* IUPDATE.PERC) + IGRU2.TOTAL, IGRU2.FATUR);
                         ELSE
                             INSERT INTO AD_GRUPOSPRODUSUDIA (ID, IDGRU,IDMETDIA, CODGRUPOPROD, DIAANOANT, PERCRES,PESO, METADIA,DATA) VALUES
-                            (FIELD_ID, PK_GRUPO, (SELECT MAX(IDMETDIA) + 1 FROM AD_GRUPOSPRODUSUDIA AD WHERE AD.ID = FIELD_ID AND AD.IDGRU = PK_GRUPO), IGRU2.GRUPO, IGRU2.TOTAL, IGRU2.PER,10, ((IGRU2.TOTAL/100)* 10)+IGRU2.TOTAL, IGRU2.FATUR);
+                            (FIELD_ID, PK_GRUPO, (SELECT MAX(IDMETDIA) + 1 FROM AD_GRUPOSPRODUSUDIA AD WHERE AD.ID = FIELD_ID AND AD.IDGRU = PK_GRUPO), IGRU2.GRUPO, IGRU2.TOTAL, IGRU2.PER,IUPDATE.PERC ,((IGRU2.TOTAL/100)* IUPDATE.PERC) + IGRU2.TOTAL, IGRU2.FATUR);
                         END IF;
                     END LOOP;    
             END LOOP;
@@ -857,13 +857,9 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
             UPDATE AD_GRUMETEMP SET VLRMESANT = IVLREMP.TT WHERE ID = FIELD_ID AND CODEMP = IVLREMP.CODEMP;
 
         END LOOP; 
- 
---            RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
---Grupo FILHO já existe! <br> ' || to_char(FIELD_ID) ||' / ' || to_char(PDTINI) ||' / ' || to_char(PDTFIN) ||'.</font></b><br><font>');
-    --INICIO DAS ATUALIZAÇÕES DE PERCENTUAL
-    ---------------------------------------------------------------------------------------------------------------------------
-    --atualiza os campos da empresa calculando % e etc.
-    ---------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------
+--atualiza os campos da empresa calculando % e etc.
+---------------------------------------------------------------------------------------------------------------------------
          FOR IEMP IN (SELECT A.ID
                        , A.IDMETEMP
                        , NVL(A.VLRMESANT,0) AS VLRMESANT
@@ -871,12 +867,16 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                        , A.CODEMP
                        , CASE WHEN A.PER IS NULL THEN 10
                               ELSE A.PER END AS PER
-                       --, NVL((NVL(A.VLRMESANT,1) / (SELECT SUM(B.VLRMESANT) FROM AD_GRUMETEMP B WHERE B.ID = A.ID)) * 100,0) AS PERANO
                        , NVL(((NVL(VLRMESANT,1) / 100) * NVL(PER,10)) + VLRMESANT,0) AS META
                   FROM AD_GRUMETEMP A 
                   WHERE A.ID = FIELD_ID)
         LOOP
             UPDATE AD_GRUMETEMP SET VLRMESANT = IEMP.VLRMESANT, PESO = IEMP.PESO, META = IEMP.META, PER = IEMP.PER, DTMESINI = PDTINI, DTMESFIN = PDTFIN WHERE ID = FIELD_ID AND IDMETEMP = IEMP.IDMETEMP; --COMMIT;
+
+            --VERIFICA SE EXISTE EMPRESA ZERADA
+            IF IEMP.VLRMESANT = 0 THEN
+                PMSG := PMSG || '<br>Empresa ' || TO_CHAR(IEMP.CODEMP) || ' com valor = 0!';
+            END IF;
 
 --INICIA DISTRIGUIÇÃO POR DIA
             FOR IEMPGRU IN (SELECT G.IDGRU, G.CODGRUPOPROD AS GRUPO, G.META, G.DATA, G.SUGESTAO, G.PERC, (SELECT SUM(A.META) FROM AD_GRUPOSPRODUSU A WHERE A.ID = G.ID) AS TOTALZAO
@@ -988,8 +988,7 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                     FROM AD_METEMPVENDDIA AD
                     WHERE AD.ID = FIELD_ID
                       AND AD.IDMETEMP = IEMP.IDMETEMP;
-                    --select * from AD_METEMPVENDDIA
-
+                    
                     IF IDIAVENDPK = 0 THEN
                         INSERT INTO AD_METEMPVENDDIA (ID, IDMETEMP, IDGRUEMPVEN, CODGRUPOPROD, CODEMP, CODVEND, DATA, VLR) VALUES
                         (FIELD_ID, IEMP.IDMETEMP, 1, IDIAVEND.GRUPO, IEMP.CODEMP, IDIAVEND.CODVEND, IDIAVEND.FATUR, IDIAVEND.TOTAL);
@@ -1120,13 +1119,9 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                                                                 
                                                                                 END 
                                                           END) FROM TGFGRU GG WHERE GG.CODGRUPOPROD = PRO.CODGRUPOPROD) = ADA.CODGRUPOPROD
-                                                          -----
-                                                          AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),-11),'MONTH'),'DD/MM/YY'),-1)
-                                                                                 AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-12)
-                                                          --AND (to_char(ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),-11),'MONTH'),'DD/MM/YY'),-1), 'd')) NOT IN (1,7)
+                                                          AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI AND PDTFIN
                                                           AND ADA.ID = FIELD_ID 
-                                                          AND ADA.CODGRUPOPROD = IEMPGRU.GRUPO--APAGAR
-                                                          --(SELECT MAX(A.ID) FROM AD_GRUPOSPRODUSU A WHERE A.ID IN (SELECT MAX(AD.ID) FROM AD_GRUPOSPRODUSU AD INNER JOIN AD_GRUPROSPROD AA ON (AA.ID = AD.ID) WHERE TO_CHAR(AA.DTVIGOR, 'MM') = TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE),-1), 'MM') GROUP BY AD.ID))
+                                                          AND ADA.CODGRUPOPROD = IEMPGRU.GRUPO
                                                         GROUP BY CAB.CODEMP, ADA.CODGRUPOPROD, TO_CHAR(TRUNC(CAB.DTFATUR), 'd'), TRUNC(CAB.DTFATUR))
                                       --FIM TOTALZAO -------------------------------------------------------------
                                       ) * 100)) AS PER
@@ -1166,33 +1161,26 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                                         
                                                         END 
                                   END) FROM TGFGRU GG WHERE GG.CODGRUPOPROD = PRO.CODGRUPOPROD) = ADA.CODGRUPOPROD
-                                  -----
-                                  AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),-11),'MONTH'),'DD/MM/YY'),-1)
-                                                         AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-12)
-                                  --AND (to_char(ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),-11),'MONTH'),'DD/MM/YY'),-1), 'd')) NOT IN (1,7)
+                                  AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI AND PDTFIN
                                   AND ADA.ID = FIELD_ID 
-                                  AND ADA.CODGRUPOPROD = IEMPGRU.GRUPO--APAGAR
-                                  --(SELECT MAX(A.ID) FROM AD_GRUPOSPRODUSU A WHERE A.ID IN (SELECT MAX(AD.ID) FROM AD_GRUPOSPRODUSU AD INNER JOIN AD_GRUPROSPROD AA ON (AA.ID = AD.ID) WHERE TO_CHAR(AA.DTVIGOR, 'MM') = TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE),-1), 'MM') GROUP BY AD.ID))
+                                  AND ADA.CODGRUPOPROD = IEMPGRU.GRUPO
                                 GROUP BY CAB.CODEMP, ADA.CODGRUPOPROD, TO_CHAR(TRUNC(CAB.DTFATUR), 'd'), TRUNC(CAB.DTFATUR)
-                                --)
                                 ORDER BY 3))
-                                ------------------------------------------------------------------------------------=======================================
                 LOOP
-                            SELECT COUNT(*)
-                            INTO CONTDIAS
-                            FROM AD_GRUMETEMPDIA AD
-                            WHERE AD.ID = FIELD_ID
-                              AND AD.IDMETEMP = IEMP.IDMETEMP;
-                            --select * from AD_GRUMETEMPDIA
-                            
-                            IF CONTDIAS = 0 THEN
-                                INSERT INTO AD_GRUMETEMPDIA (ID, IDMETEMP, IDGRUMETDIA, CODGRUPOPROD, DATA, PESO, PER, VLRVENDA, META, PERGRUEMP, CODEMP) VALUES 
-                                (FIELD_ID, IEMP.IDMETEMP, 1, IEMPDIAS.GRUPO, IEMPDIAS.FATUR, IEMPDIAS.PER, 10, IEMPDIAS.TOTAL, IEMPDIAS.META, IEMPDIAS.PERGRU, IEMPDIAS.CODEMP);
-                            ELSE
-                                INSERT INTO AD_GRUMETEMPDIA (ID, IDMETEMP, IDGRUMETDIA, CODGRUPOPROD, DATA, PESO, PER, VLRVENDA, META, PERGRUEMP, CODEMP) VALUES 
-                                (FIELD_ID, IEMP.IDMETEMP, (SELECT MAX(IDGRUMETDIA) + 1 FROM AD_GRUMETEMPDIA), IEMPDIAS.GRUPO, IEMPDIAS.FATUR, IEMPDIAS.PER, 10, IEMPDIAS.TOTAL, IEMPDIAS.META, IEMPDIAS.PERGRU, IEMPDIAS.CODEMP); 
-                            END IF;
-                            
+                    SELECT COUNT(*)
+                    INTO CONTDIAS
+                    FROM AD_GRUMETEMPDIA AD
+                    WHERE AD.ID = FIELD_ID
+                      AND AD.IDMETEMP = IEMP.IDMETEMP;
+                    
+                    IF CONTDIAS = 0 THEN
+                        INSERT INTO AD_GRUMETEMPDIA (ID, IDMETEMP, IDGRUMETDIA, CODGRUPOPROD, DATA, PESO, PER, VLRVENDA, META, PERGRUEMP, CODEMP) VALUES 
+                        (FIELD_ID, IEMP.IDMETEMP, 1, IEMPDIAS.GRUPO, IEMPDIAS.FATUR, IEMPDIAS.PER, 10, IEMPDIAS.TOTAL, IEMPDIAS.META, IEMPDIAS.PERGRU, IEMPDIAS.CODEMP);
+                    ELSE
+                        INSERT INTO AD_GRUMETEMPDIA (ID, IDMETEMP, IDGRUMETDIA, CODGRUPOPROD, DATA, PESO, PER, VLRVENDA, META, PERGRUEMP, CODEMP) VALUES 
+                        (FIELD_ID, IEMP.IDMETEMP, (SELECT MAX(IDGRUMETDIA) + 1 FROM AD_GRUMETEMPDIA), IEMPDIAS.GRUPO, IEMPDIAS.FATUR, IEMPDIAS.PER, 10, IEMPDIAS.TOTAL, IEMPDIAS.META, IEMPDIAS.PERGRU, IEMPDIAS.CODEMP); 
+                    END IF;
+                    
                     FOR IGRUFI IN ( 
                                SELECT PRO.CODGRUPOPROD AS GRUPO,
                                       TO_CHAR(TRUNC(CAB.DTFATUR), 'd') AS DATA,
@@ -1234,30 +1222,29 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                 GROUP BY CAB.CODEMP, PRO.CODGRUPOPROD, TO_CHAR(TRUNC(CAB.DTFATUR), 'd'), TRUNC(CAB.DTFATUR)
                                 ORDER BY 1)
                     LOOP
-                            SELECT COUNT(*)
-                            INTO CONTDIAS
+                        SELECT COUNT(*)
+                        INTO CONTDIAS
+                        FROM AD_METEMPGRUSUBGRU AD
+                        WHERE AD.ID = FIELD_ID
+                          AND AD.IDMETEMP = IEMP.IDMETEMP
+                          AND AD.IDGRUMETDIA = IGRUFI.IDGRUMETDIA;
+                        
+                        IF CONTDIAS = 0 THEN
+                            INSERT INTO AD_METEMPGRUSUBGRU (ID, IDMETEMP, IDGRUMETDIA, IDEMPGRUFI, CODGRUPOPROD, VLR, CODEMP, DATA) VALUES
+                            (FIELD_ID, IEMP.IDMETEMP, IGRUFI.IDGRUMETDIA, 1, IGRUFI.GRUPO, IGRUFI.TOTAL, IEMP.CODEMP, IGRUFI.FATUR);
+                            IDEMPGRUFIPK := 1;
+                        ELSE
+                        
+                            SELECT MAX(IDEMPGRUFI) + 1
+                            INTO IDEMPGRUFIPK
                             FROM AD_METEMPGRUSUBGRU AD
                             WHERE AD.ID = FIELD_ID
                               AND AD.IDMETEMP = IEMP.IDMETEMP
                               AND AD.IDGRUMETDIA = IGRUFI.IDGRUMETDIA;
-                            --select * from AD_METEMPGRUSUBGRU
-                            
-                            IF CONTDIAS = 0 THEN
-                                INSERT INTO AD_METEMPGRUSUBGRU (ID, IDMETEMP, IDGRUMETDIA, IDEMPGRUFI, CODGRUPOPROD, VLR, CODEMP, DATA) VALUES
-                                (FIELD_ID, IEMP.IDMETEMP, IGRUFI.IDGRUMETDIA, 1, IGRUFI.GRUPO, IGRUFI.TOTAL, IEMP.CODEMP, IGRUFI.FATUR);
-                                IDEMPGRUFIPK := 1;
-                            ELSE
-                            
-                                SELECT MAX(IDEMPGRUFI) + 1
-                                INTO IDEMPGRUFIPK
-                                FROM AD_METEMPGRUSUBGRU AD
-                                WHERE AD.ID = FIELD_ID
-                                  AND AD.IDMETEMP = IEMP.IDMETEMP
-                                  AND AD.IDGRUMETDIA = IGRUFI.IDGRUMETDIA;
-                            
-                                INSERT INTO AD_METEMPGRUSUBGRU (ID, IDMETEMP, IDGRUMETDIA, IDEMPGRUFI, CODGRUPOPROD, VLR, CODEMP, DATA) VALUES
-                                (FIELD_ID, IEMP.IDMETEMP, IGRUFI.IDGRUMETDIA, IDEMPGRUFIPK, IGRUFI.GRUPO, IGRUFI.TOTAL, IEMP.CODEMP, IGRUFI.FATUR); 
-                            END IF;
+                        
+                            INSERT INTO AD_METEMPGRUSUBGRU (ID, IDMETEMP, IDGRUMETDIA, IDEMPGRUFI, CODGRUPOPROD, VLR, CODEMP, DATA) VALUES
+                            (FIELD_ID, IEMP.IDMETEMP, IGRUFI.IDGRUMETDIA, IDEMPGRUFIPK, IGRUFI.GRUPO, IGRUFI.TOTAL, IEMP.CODEMP, IGRUFI.FATUR); 
+                        END IF;
                             
                         --INSERE OS VENDEDORES COM GRUPOS FILHOS
                         FOR IGRUFIVEND IN (SELECT * FROM 
@@ -1332,13 +1319,32 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                         END LOOP;                        
                     END LOOP;
                 END LOOP; 
-                
-                --------------------------==================================================================================================================
             END LOOP;
         END LOOP;
     END IF;
-    
 END LOOP; --LOOP DAS LINHAS SELECIONADAS
+
+    CONT := 99;
+    FOR IEMP2 IN (SELECT NVL(A.VLRMESANT,0) AS VLRMESANT
+                , A.CODEMP
+            FROM AD_GRUMETEMP A 
+            WHERE A.ID = FIELD_ID
+            ORDER BY CODEMP)
+    LOOP
+            --VERIFICA SE EXISTE EMPRESA ZERADA
+            IF IEMP2.VLRMESANT = 0 THEN
+                IF CONT = 99 THEN
+                    PMSG := PMSG || '<br>Empresa(s) ' || TO_CHAR(IEMP2.CODEMP);
+                    CONT := 0;
+                ELSE
+                    PMSG := PMSG || ', ' || TO_CHAR(IEMP2.CODEMP);
+                END IF;
+            END IF;
+    END LOOP;
+        IF CONT = 0 THEN
+            PMSG := PMSG || ' não tem valor de venda no período, inserir valor no botão <i>Outras Opções</i> <b>></b><i>Gerar dados para nova Empresa</i>!';
+        END IF;
+
 PMSG := PMSG || 'Script finalizado!';
 EXECUTE IMMEDIATE 'ALTER TRIGGER AD_GRUPROSPRODMETVEN_TOTAL ENABLE';
 EXECUTE IMMEDIATE 'ALTER TRIGGER AD_GRUPOSPRODUSU_TOTAL ENABLE';
