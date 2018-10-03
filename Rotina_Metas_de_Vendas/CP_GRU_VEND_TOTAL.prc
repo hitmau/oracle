@@ -33,7 +33,7 @@ CREATE OR REPLACE PROCEDURE TOTALPRD."CP_GRU_VEND_TOTAL" (
        IDGRUVENDFILHOPK INT;
        IDIAVENDPK INT;
        IDEMPGRUFIPK INT;
-       
+       IEMPVEND INT;
        PVLRANOANT INT;
 BEGIN
 
@@ -786,6 +786,8 @@ BEGIN
 --PROCEDIMENTOS COM EMPRESAS-------------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------
     IF ATUEMP = 'S' THEN
+        DELETE FROM AD_EMPVEND AD WHERE AD.ID = FIELD_ID;
+    
         DELETE FROM AD_EMPGRUVENFI AD WHERE AD.ID = FIELD_ID;
     
         DELETE FROM AD_METEMPVENDDIA AD WHERE AD.ID = FIELD_ID;
@@ -861,17 +863,126 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
 --atualiza os campos da empresa calculando % e etc.
 ---------------------------------------------------------------------------------------------------------------------------
         FOR IEMP IN (SELECT A.ID
-                       , A.IDMETEMP
-                       , NVL(A.VLRMESANT,0) AS VLRMESANT
-                       , NVL(((A.VLRMESANT / (SELECT SUM(B.VLRMESANT) FROM AD_GRUMETEMP B WHERE B.ID = A.ID)) * 100),0) AS PESO
-                       , A.CODEMP
-                       , CASE WHEN A.PER IS NULL THEN 10
-                              ELSE A.PER END AS PER
-                       , NVL(((NVL(VLRMESANT,1) / 100) * NVL(PER,10)) + VLRMESANT,0) AS META
+                        , A.IDMETEMP
+                        , NVL(A.VLRMESANT,0) AS VLRMESANT
+                        , NVL(((A.VLRMESANT / (SELECT SUM(B.VLRMESANT) FROM AD_GRUMETEMP B WHERE B.ID = A.ID)) * 100),0) AS PESO
+                        , A.CODEMP
+                        , CASE WHEN A.PER IS NULL THEN 10
+                               ELSE A.PER END AS PER
+                        , NVL(((NVL(VLRMESANT,1) / 100) * NVL(PER,10)) + VLRMESANT,0) AS META
                   FROM AD_GRUMETEMP A 
                   WHERE A.ID = FIELD_ID)
         LOOP
             UPDATE AD_GRUMETEMP SET VLRMESANT = IEMP.VLRMESANT, PESO = IEMP.PESO, META = IEMP.META, PER = IEMP.PER, DTMESINI = PDTINI, DTMESFIN = PDTFIN WHERE ID = FIELD_ID AND IDMETEMP = IEMP.IDMETEMP; --COMMIT;
+            
+------------------------------------------------------------------------------------------------------------------------------------------------------------          
+--INSERE VENDEDORES POR EMPRESA
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+                FOR IVEND IN (SELECT TOTAL
+                                      
+                                      , CODVEND
+                                      , (SELECT SUM(TOTAL)
+                                                               FROM ( 
+                                                                     SELECT 
+                                                                     
+                                                              
+                                                              --ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),-11),'MONTH'),'DD/MM/YY'),-1) AS DIAS,
+                                                              SUM( ((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI)  * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV ) AS TOTAL
+                                                        FROM TGFCAB C INNER JOIN TGFITE ITE ON (C.NUNOTA = ITE.NUNOTA)
+                                                                        INNER JOIN TGFPRO PRO ON (ITE.CODPROD = PRO.CODPROD)
+                                                                        INNER JOIN VGFCAB VCA ON (C.NUNOTA = VCA.NUNOTA)
+                                                                        INNER JOIN TGFTOP TOP ON (C.CODTIPOPER = TOP.CODTIPOPER AND C.DHTIPOPER = TOP.DHALTER AND TOP.GOLSINAL = -1)
+                                                                        , AD_GRUPOSPRODUSU ADA
+                                                        WHERE C.CODTIPOPER IN (SELECT REGEXP_SUBSTR(REPLACE(PCODTIPOPER, ' ',''),'[^,]+', 1, LEVEL) AS RESULTADO FROM DUAL CONNECT BY REGEXP_SUBSTR(REPLACE(PCODTIPOPER, ' ',''), '[^,]+', 1, LEVEL) IS NOT NULL)
+                                                          AND C.STATUSNFE= 'A'
+                                                          AND C.CODEMP = IEMP.CODEMP
+                                                          AND (SELECT (CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))) IS NOT NULL  
+                                                                            THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))
+                                                                            ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))) IS NOT NULL
+                                                                                THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))
+                                                                                ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))) IS NOT NULL
+                                                                                            THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))
+                                                                                            ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))) IS NOT NULL
+                                                                                                    THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))
+                                                                                                    ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))) IS NOT NULL
+                                                                                                                THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))))
+                                                                                                                ELSE TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU5.CODGRUPAI FROM TGFGRU GRU5 WHERE GRU5.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))))
+                                                                                                        END
+                                                                                                    
+                                                                                                END 
+                                                                                            
+                                                                                    END 
+                                                                                
+                                                                                END 
+                                                          END) FROM TGFGRU GG WHERE GG.CODGRUPOPROD = PRO.CODGRUPOPROD) = ADA.CODGRUPOPROD
+                                                          AND TRUNC(C.DTFATUR) BETWEEN PDTINI AND PDTFIN
+                                                          AND ADA.ID = FIELD_ID 
+                                                        GROUP BY C.CODEMP)) AS TOTALZAO
+                                      --FIM TOTALZAO -------------------------------------------------------------
+                                       FROM ( 
+                                             SELECT
+                                      
+                                      CAB.CODVEND,
+                                      SUM( ((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI)  * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV ) AS TOTAL
+                                FROM TGFCAB CAB INNER JOIN TGFITE ITE ON (CAB.NUNOTA = ITE.NUNOTA)
+                                                INNER JOIN TGFPRO PRO ON (ITE.CODPROD = PRO.CODPROD)
+                                                INNER JOIN VGFCAB VCA ON (CAB.NUNOTA = VCA.NUNOTA)
+                                                INNER JOIN TGFTOP TOP ON (CAB.CODTIPOPER = TOP.CODTIPOPER AND CAB.DHTIPOPER = TOP.DHALTER AND TOP.GOLSINAL = -1)
+                                                , AD_GRUPOSPRODUSU ADA
+                                WHERE CAB.CODTIPOPER IN (SELECT REGEXP_SUBSTR(REPLACE(PCODTIPOPER, ' ',''),'[^,]+', 1, LEVEL) AS RESULTADO FROM DUAL CONNECT BY REGEXP_SUBSTR(REPLACE(PCODTIPOPER, ' ',''), '[^,]+', 1, LEVEL) IS NOT NULL)
+                                  AND CAB.STATUSNFE= 'A'
+                                  AND CAB.CODEMP = IEMP.CODEMP
+                                  AND (SELECT (CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))) IS NOT NULL  
+                                                    THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))
+                                                    ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))) IS NOT NULL
+                                                        THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))
+                                                        ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))) IS NOT NULL
+                                                                    THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))
+                                                                    ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))) IS NOT NULL
+                                                                            THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))
+                                                                            ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))) IS NOT NULL
+                                                                                        THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))))
+                                                                                        ELSE TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU5.CODGRUPAI FROM TGFGRU GRU5 WHERE GRU5.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))))
+                                                                                END
+                                                                            
+                                                                        END 
+                                                                    
+                                                            END 
+                                                        
+                                                        END 
+                                  END) FROM TGFGRU GG WHERE GG.CODGRUPOPROD = PRO.CODGRUPOPROD) = ADA.CODGRUPOPROD
+                                  -----
+                                  AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI AND PDTFIN
+                                  --AND (to_char(ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),-11),'MONTH'),'DD/MM/YY'),-1), 'd')) NOT IN (1,7)
+                                  AND ADA.ID = FIELD_ID 
+
+                                  --(SELECT MAX(A.ID) FROM AD_GRUPOSPRODUSU A WHERE A.ID IN (SELECT MAX(AD.ID) FROM AD_GRUPOSPRODUSU AD INNER JOIN AD_GRUPROSPROD AA ON (AA.ID = AD.ID) WHERE TO_CHAR(AA.DTVIGOR, 'MM') = TO_CHAR(ADD_MONTHS(TRUNC(SYSDATE),-1), 'MM') GROUP BY AD.ID))
+                                GROUP BY CAB.CODVEND) A)
+                LOOP
+                    SELECT COUNT(*)
+                    INTO IEMPVEND
+                    FROM AD_EMPVEND AD
+                    WHERE AD.ID = FIELD_ID
+                      AND AD.IDMETEMP = IEMP.IDMETEMP;
+                      
+                    --SELECT * FROM AD_EMPVEND
+                    IF IEMPVEND = 0 THEN
+                        INSERT INTO AD_EMPVEND (ID, IDMETEMP, IDEMPVEND, CODEMP, CODVEND, VLR, PESO, META) VALUES
+                        (FIELD_ID, IEMP.IDMETEMP, 1,  IEMP.CODEMP, IVEND.CODVEND, IVEND.TOTAL, (IVEND.TOTAL / IVEND.TOTALZAO) * 100, IVEND.TOTAL + ((IVEND.TOTAL / 100) * ((IVEND.TOTAL / IEMP.META) * 100)));
+                        IEMPVEND := 1;
+                    ELSE
+                    
+                        SELECT MAX(IDEMPVEND) + 1
+                        INTO IEMPVEND
+                        FROM AD_EMPVEND AD
+                        WHERE AD.ID = FIELD_ID
+                          AND AD.IDMETEMP = IEMP.IDMETEMP;
+                    
+                        INSERT INTO AD_EMPVEND (ID, IDMETEMP, IDEMPVEND, CODEMP, CODVEND, VLR, PESO, META) VALUES
+                        (FIELD_ID, IEMP.IDMETEMP, IEMPVEND,  IEMP.CODEMP, IVEND.CODVEND, IVEND.TOTAL, (IVEND.TOTAL / IVEND.TOTALZAO) * 100, IVEND.TOTAL + ((IVEND.TOTAL / 100) * ((IVEND.TOTAL / IEMP.META) * 100)));
+                    END IF;
+                END LOOP; --INSERE VENDEDORES POR EMPRESA
+            
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 --INICIA DISTRIGUIÇÃO POR DIA NAS EMPRESAS
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -929,6 +1040,7 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                                         GROUP BY C.CODEMP, ADA.CODGRUPOPROD, TO_CHAR(TRUNC(C.DTFATUR), 'd'), C.CODVEND, TRUNC(C.DTFATUR)) CC
                                                         WHERE CC.CODVEND = A.CODVEND) AS TOTALZAO
                                       --FIM TOTALZAO -------------------------------------------------------------
+
                                       , CODEMP
                                       , CODVEND
                                       , TOTAL+(TOTAL/100)*10 AS META 
@@ -983,8 +1095,8 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                       AND AD.IDMETEMP = IEMP.IDMETEMP;
                     
                     IF IDIAVENDPK = 0 THEN
-                        INSERT INTO AD_METEMPVENDDIA (ID, IDMETEMP, IDGRUEMPVEN, CODGRUPOPROD, CODEMP, CODVEND, DATA, VLR, PESO) VALUES
-                        (FIELD_ID, IEMP.IDMETEMP, 1, IDIAVEND.GRUPO, IEMP.CODEMP, IDIAVEND.CODVEND, IDIAVEND.FATUR, IDIAVEND.TOTAL, (IDIAVEND.TOTAL / IDIAVEND.TOTALZAO)*100);
+                        INSERT INTO AD_METEMPVENDDIA (ID, IDMETEMP, IDGRUEMPVEN, CODGRUPOPROD, CODEMP, CODVEND, DATA, VLR, PESO, T) VALUES
+                        (FIELD_ID, IEMP.IDMETEMP, 1, IDIAVEND.GRUPO, IEMP.CODEMP, IDIAVEND.CODVEND, IDIAVEND.FATUR, IDIAVEND.META, (IDIAVEND.TOTAL / IDIAVEND.TOTALZAO) * 100, (IDIAVEND.META / IEMP.META) * 100);
                         IDIAVENDPK := 1;
                     ELSE
                     
@@ -994,21 +1106,52 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                         WHERE AD.ID = FIELD_ID
                           AND AD.IDMETEMP = IEMP.IDMETEMP;
                     
-                        INSERT INTO AD_METEMPVENDDIA (ID, IDMETEMP, IDGRUEMPVEN, CODGRUPOPROD, CODEMP, CODVEND, DATA, VLR, PESO) VALUES
-                        (FIELD_ID, IEMP.IDMETEMP, IDIAVENDPK, IDIAVEND.GRUPO, IEMP.CODEMP, IDIAVEND.CODVEND, IDIAVEND.FATUR, IDIAVEND.TOTAL, (IDIAVEND.TOTAL / IDIAVEND.TOTALZAO)*100) ;
+                        INSERT INTO AD_METEMPVENDDIA (ID, IDMETEMP, IDGRUEMPVEN, CODGRUPOPROD, CODEMP, CODVEND, DATA, VLR, PESO, T) VALUES
+                        (FIELD_ID, IEMP.IDMETEMP, IDIAVENDPK, IDIAVEND.GRUPO, IEMP.CODEMP, IDIAVEND.CODVEND, IDIAVEND.FATUR, IDIAVEND.META, (IDIAVEND.TOTAL / IDIAVEND.TOTALZAO) * 100, (IDIAVEND.META / IEMP.META) * 100) ;
                     END IF;
+
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 --INSERE FILHOS DOS GRUPOS DOS VENDEDORES DAS EMPRESAS
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
-                        FOR IGRUVENFI IN (SELECT 
-                                          PRO.CODGRUPOPROD AS GRUPO,
-                                          TO_CHAR(TRUNC(CAB.DTFATUR), 'd') AS DATA,
-                                          TRUNC(CAB.DTFATUR) AS FATUR,
-                                          CAB.CODEMP,
-                                          CAB.CODVEND,
-                                          --(SELECT AD.IDGRUMETDIA FROM AD_GRUMETEMPDIA AD WHERE AD.ID = FIELD_ID  AND AD.CODEMP = IEMP.CODEMP  AND AD.DATA = IEMPDIAS.FATUR  AND AD.CODGRUPOPROD = IEMPDIAS.GRUPO) AS IDGRUMETDIA,
-                                         --ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),-11),'MONTH'),'DD/MM/YY'),-1) AS DIAS,
-                                          SUM( ((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI)  * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV ) AS TOTAL
+                        FOR IGRUVENFI IN (SELECT PRO.CODGRUPOPROD AS GRUPO
+                                       ,  TO_CHAR(TRUNC(CAB.DTFATUR), 'd') AS DATA
+                                       ,  TRUNC(CAB.DTFATUR) AS FATUR
+                                       ,  CAB.CODEMP
+                                       ,  CAB.CODVEND
+                                       ,  SUM(((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI)  * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV ) AS TOTAL
+                                       , (SELECT SUM(((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI)  * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV ) AS TOTAL
+                                    FROM TGFCAB CAB INNER JOIN TGFITE ITE ON (CAB.NUNOTA = ITE.NUNOTA)
+                                                    INNER JOIN TGFPRO PRO ON (ITE.CODPROD = PRO.CODPROD)
+                                                    INNER JOIN VGFCAB VCA ON (CAB.NUNOTA = VCA.NUNOTA)
+                                                    INNER JOIN TGFTOP TOP ON (CAB.CODTIPOPER = TOP.CODTIPOPER AND CAB.DHTIPOPER = TOP.DHALTER AND TOP.GOLSINAL = -1)
+                                                    , AD_GRUPOSPRODUSU ADA
+                                    WHERE CAB.CODTIPOPER IN (SELECT REGEXP_SUBSTR(REPLACE(PCODTIPOPER, ' ',''),'[^,]+', 1, LEVEL) AS RESULTADO FROM DUAL CONNECT BY REGEXP_SUBSTR(REPLACE(PCODTIPOPER, ' ',''), '[^,]+', 1, LEVEL) IS NOT NULL)
+                                      AND CAB.STATUSNFE= 'A'
+                                      AND CAB.CODEMP = IEMP.CODEMP
+                                      AND CAB.CODVEND = IDIAVEND.CODVEND
+                                      AND (SELECT (CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))) IS NOT NULL  
+                                                        THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))
+                                                        ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))) IS NOT NULL
+                                                            THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))
+                                                            ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))) IS NOT NULL
+                                                                        THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))
+                                                                        ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))) IS NOT NULL
+                                                                                THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))
+                                                                                ELSE CASE WHEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))) IS NOT NULL
+                                                                                            THEN TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD)))))))
+                                                                                            ELSE TO_CHAR((SELECT G2.CODGRUPOPROD FROM AD_GRUPROSPROD G1 INNER JOIN AD_GRUPOSPRODUSU G2 ON (G1.ID=G2.ID)  WHERE G1.ID = ADA.ID AND    G2.CODGRUPOPROD = (SELECT GRU4.CODGRUPAI FROM TGFGRU GRU4 WHERE GRU4.CODGRUPOPROD = (SELECT GRU5.CODGRUPAI FROM TGFGRU GRU5 WHERE GRU5.CODGRUPOPROD = (SELECT GRU3.CODGRUPAI FROM TGFGRU GRU3 WHERE GRU3.CODGRUPOPROD = (SELECT GRU2.CODGRUPAI FROM TGFGRU GRU2 WHERE GRU2.CODGRUPOPROD = (SELECT GRU.CODGRUPAI FROM TGFGRU GRU WHERE GRU.CODGRUPOPROD = (SELECT CODGRUPOPROD FROM TGFGRU WHERE CODGRUPOPROD = GG.CODGRUPOPROD))))))))
+                                                                                    END
+                                                                                
+                                                                            END 
+                                                                        
+                                                                END 
+                                                            
+                                                            END 
+                                        END) FROM TGFGRU GG WHERE GG.CODGRUPOPROD = PRO.CODGRUPOPROD) = ADA.CODGRUPOPROD
+                                      AND ADA.CODGRUPOPROD = IDIAVEND.GRUPO
+                                      AND TRUNC(CAB.DTFATUR) = IDIAVEND.FATUR
+                                      AND ADA.ID = FIELD_ID
+                                      AND CAB.CODVEND = IDIAVEND.CODVEND) AS TOTALZAO
                                     FROM TGFCAB CAB INNER JOIN TGFITE ITE ON (CAB.NUNOTA = ITE.NUNOTA)
                                                     INNER JOIN TGFPRO PRO ON (ITE.CODPROD = PRO.CODPROD)
                                                     INNER JOIN VGFCAB VCA ON (CAB.NUNOTA = VCA.NUNOTA)
@@ -1429,7 +1572,7 @@ END LOOP; --LOOP DAS LINHAS SELECIONADAS
             PMSG := PMSG || ' não tem valor de venda no período, inserir valor no botão <i>Outras Opções</i> <b>></b><i>Gerar dados para nova Empresa</i>!';
         END IF;
 
-PMSG := PMSG || 'Script finalizado!';
+PMSG := PMSG || ' Script finalizado!';
 EXECUTE IMMEDIATE 'ALTER TRIGGER AD_GRUPROSPRODMETVEN_TOTAL ENABLE';
 EXECUTE IMMEDIATE 'ALTER TRIGGER AD_GRUPOSPRODUSU_TOTAL ENABLE';
 P_MENSAGEM := PMSG;

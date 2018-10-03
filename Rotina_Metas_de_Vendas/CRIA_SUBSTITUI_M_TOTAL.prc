@@ -1,4 +1,4 @@
-CREATE OR REPLACE PROCEDURE TOTALPRD.CRIA_SUBSTITUI_M_TOTAL (
+                                    CREATE OR REPLACE PROCEDURE TOTALPRD.CRIA_SUBSTITUI_M_TOTAL (
        P_CODUSU NUMBER,        -- Código do usuário logado
        P_IDSESSAO VARCHAR2,    -- Identificador da execução. Serve para buscar informações dos parâmetros/campos da execução.
        P_QTDLINHAS NUMBER,     -- Informa a quantidade de registros selecionados no momento da execução.
@@ -10,17 +10,19 @@ CREATE OR REPLACE PROCEDURE TOTALPRD.CRIA_SUBSTITUI_M_TOTAL (
     
     EMPORIG INT;
     EMPDEST INT;
+    VLREMP FLOAT;
     PEMPORIG INT;
     PEMPDEST INT;
     PEMPVLRDEST FLOAT;
     PEMPVLRORIG FLOAT;
     PNOMEEMP VARCHAR(100);
+    VLR FLOAT;
 BEGIN
     --Parametros
---        OPCAOC := ACT_INT_PARAM(P_IDSESSAO,'OPCAOC');    --Copia Grupos anteriores C = copiar
---        OPCAOR := ACT_TXT_PARAM(P_IDSESSAO,'OPCAOR');    --Recalcula Grupos R = recalcular
         EMPORIG := ACT_INT_PARAM(P_IDSESSAO,'EMPORIG');   --Insere vendedores por Gerente
         EMPDEST := ACT_INT_PARAM(P_IDSESSAO,'EMPDEST');   --ou Insere vendedores por Grupo
+        VLREMP := ACT_DEC_PARAM(P_IDSESSAO,'VLREMP');   --ou Insere vendedores por Grupo
+        
 --        PARAM_RECALC := ACT_TXT_PARAM(P_IDSESSAO,'RECALC'); --Recalcula Vendedores
 --        RECMET := ACT_TXT_PARAM(P_IDSESSAO,'RECMET');   --Inserir/Recalcular grupos de Meta
 --        ATUEMP := ACT_TXT_PARAM(P_IDSESSAO,'ATUEMP');   --Inserir/Recalcular grupos de Meta
@@ -36,48 +38,97 @@ BEGIN
        --     NOME DO PARAMETRO - Determina qual parametro deve se deseja obter.
 
 
-    FOR I IN 1..P_QTDLINHAS -- Este loop permite obter o valor de campos dos registros envolvidos na execução.
-    LOOP                    -- A variável "I" representa o registro corrente.
-       -- Para obter o valor dos campos utilize uma das seguintes funções:
-       --     ACT_INT_FIELD (Retorna o valor de um campo tipo NUMÉRICO INTEIRO))
-       --     ACT_DEC_FIELD (Retorna o valor de um campo tipo NUMÉRICO DECIMAL))
-       --     ACT_TXT_FIELD (Retorna o valor de um campo tipo TEXTO),
-       --     ACT_DTA_FIELD (Retorna o valor de um campo tipo DATA)
-       -- Estas funções recebem 3 argumentos:
-       --     ID DA SESSÃO - Identificador da execução (Obtido através do parâmetro P_IDSESSAO))
-       --     NÚMERO DA LINHA - Relativo a qual linha selecionada.
-       --     NOME DO CAMPO - Determina qual campo deve ser obtido.
-       FIELD_ID := ACT_INT_FIELD(P_IDSESSAO, I, 'ID');
-       IF EMPORIG IS NULL OR EMPDEST IS NULL THEN
-RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
-Campo Empresa oritem ou Empresa destino em branco.</font></b><br><font>');
-       ELSE
-            SELECT NVL(A.META,0), (SELECT NOMEFANTASIA FROM TSIEMP WHERE CODEMP = EMPORIG) AS NOMEEMP
-            INTO PEMPVLRORIG, PNOMEEMP
-            FROM AD_GRUMETEMP A 
-            WHERE A.ID = FIELD_ID
-              AND A.CODEMP = EMPORIG;
+    FOR I IN 1..P_QTDLINHAS-- Este loop permite obter o valor de campos dos registros envolvidos na execução.
+    LOOP                 -- A variável "I" representa o registro corrente.
 
-                IF PEMPVLRORIG = 0 THEN
+       FIELD_ID := ACT_INT_FIELD(P_IDSESSAO, I, 'ID');
+       
+       
+       SELECT count(*)
+        INTO PEMPVLRORIG
+        FROM AD_GRUMETEMP A 
+        WHERE A.ID = FIELD_ID
+          AND A.CODEMP = EMPORIG;
+        
+        IF PEMPVLRORIG = 0 THEN
+RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
+Empresa origem não existe abaixo!</font></b><br><font>');
+        END IF;
+        
+        SELECT count(*)
+        INTO PEMPVLRORIG
+        FROM AD_GRUMETEMP A 
+        WHERE A.ID = FIELD_ID
+          AND A.CODEMP = EMPDEST;
+        
+        IF PEMPVLRORIG = 0 THEN
+RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
+Empresa destino não existe abaixo!</font></b><br><font>');
+        END IF;
+       
+       
+        --OBTEM O COD EMPRESA ORIGEM E O NOME.
+        SELECT NVL(A.META,0), (SELECT NOMEFANTASIA FROM TSIEMP WHERE CODEMP = EMPORIG) AS NOMEEMP
+        INTO PEMPVLRORIG, PNOMEEMP
+        FROM AD_GRUMETEMP A 
+        WHERE A.ID = FIELD_ID
+          AND A.CODEMP = EMPORIG;
+
+        --VERIFICA SE A EMPRESA ORIGEM TEM VALOR = 0.
+        IF VLREMP = 0 THEN
 RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
 Primeiro insira o valor desejado no campo Meta da Empresa '|| to_char(EMPORIG) ||' - ' || TO_CHAR(PNOMEEMP) || '.</font></b><br><font>');
-                END IF;
-
-            SELECT NVL(A.META,0), (SELECT NOMEFANTASIA FROM TSIEMP WHERE CODEMP = EMPDEST) AS NOMEEMP
-            INTO PEMPVLRDEST, PNOMEEMP
-            FROM AD_GRUMETEMP A 
-            WHERE A.ID = FIELD_ID
-              AND A.CODEMP = EMPDEST;
-            
-                IF PEMPVLRDEST = 0 THEN
-RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
-Primeiro insira o valor desejado no campo Meta da Empresa '|| to_char(EMPDEST) ||' - ' || TO_CHAR(PNOMEEMP) || '.</font></b><br><font>');
-                END IF;
-                
-                IF EMPORIG = EMPDEST THEN
+        END IF;
+  
+        --VERIFICA SE A EMPRESA ORIGEM É IGUAL A EMPRESA DESTINO.
+        IF EMPORIG = EMPDEST THEN
 RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
 O campo Origem está igual ao campo Destino!</font></b><br><font>');
-                END IF;
+        END IF;
+        
+        --OBTEM VALOR E NOME DA EMPRESA DESTINO.
+        SELECT NVL(A.META,0), (SELECT NOMEFANTASIA FROM TSIEMP WHERE CODEMP = EMPDEST) AS NOMEEMP
+        INTO PEMPVLRDEST, PNOMEEMP
+        FROM AD_GRUMETEMP A 
+        WHERE A.ID = FIELD_ID
+          AND A.CODEMP = EMPDEST;
+
+        --VERIFICA SE A EMPRESA DESTINO REALMENTE TEM VALOR = 0. 
+--        IF PEMPVLRDEST = 0 THEN
+            UPDATE AD_GRUMETEMP SET META = VLREMP WHERE ID = FIELD_ID AND CODEMP = EMPORIG;
+--        END IF;
+        
+        --Verifica a existência de vendedores cadastrados
+        SELECT COUNT(VEN.CODVEND)
+        INTO CONT
+        FROM AD_GRUMETEMP EMP INNER JOIN AD_METEMPVENDDIA VEN ON (VEN.IDMETEMP = EMP.IDMETEMP AND VEN.ID=EMP.ID) 
+        WHERE EMP.ID = FIELD_ID AND EMP.CODEMP = EMPDEST;
+
+        IF CONT > 0 THEN
+RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
+Favor inserir vendedor(es) na aba:<br>Metas por empresa > Vendedores (dia-grupo pai)!</font></b><br><font>');  
+        ELSE
+            FOR IVEND IN (SELECT VEN.ID
+                            , (SELECT MAX(E.IDMETEMP) FROM  AD_GRUMETEMP E WHERE E.ID = EMP.ID AND E.CODEMP = EMPDEST) AS PIDMETEMP
+                            , VEN.IDMETEMP
+                            , VEN.IDGRUEMPVEN
+                            , VEN.CODGRUPOPROD AS GRUPO
+                            , VEN.CODEMP
+                            , VEN.CODVEND
+                            , VEN.DATA
+                            , VEN.VLR
+                            , VEN.PESO
+                            , VEN.T
+                            , EMP.META 
+                         FROM AD_GRUMETEMP EMP INNER JOIN AD_METEMPVENDDIA VEN ON (VEN.IDMETEMP = EMP.IDMETEMP AND VEN.ID=EMP.ID) 
+                         WHERE EMP.ID = FIELD_ID 
+                           AND EMP.CODEMP = EMPORIG) 
+            LOOP
+                
+                INSERT INTO AD_METEMPVENDDIA (ID, IDMETEMP, IDGRUEMPVEN, CODGRUPOPROD, CODEMP, CODVEND, DATA, VLR, PESO, T) VALUES
+                (FIELD_ID, IVEND.PIDMETEMP, IVEND.IDGRUEMPVEN, IVEND.GRUPO, IVEND.CODEMP, IVEND.CODVEND, IVEND.DATA, VLREMP - ((VLREMP / 100) * IVEND.T), IVEND.PESO, IVEND.T) ;
+                VLR := VLREMP - ((VLREMP / 100) * IVEND.T) ;
+            END LOOP;       
         END IF;
     END LOOP;
 
