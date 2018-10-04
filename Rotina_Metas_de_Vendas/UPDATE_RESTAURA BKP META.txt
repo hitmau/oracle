@@ -1,4 +1,9 @@
-UPDATE AD_GRUPOSPRODUSU A SET A.META = (SELECT B.META
-FROM AD_GRUPOPRODBKP B 
-WHERE B.ID = 7 AND B.IDGRU = A.IDGRU
-AND TRUNC(B.DHALTER) < '01/07/2018') WHERE A.ID = 7
+Acertar calculo dos grupos, terá que ser possível escolher qualquer nível de grupo.
+Trigger para não deixar adicionar grupos parentes.
+Mudar nome para grupo: META para Ano anterior 
+Mudar nome para grupo: % para % de crescimento (padrão = 10%)
+Mudar nome para grupo: Sugestão para Meta (ano anterior + %)
+Trigger para atualizar % e/ou Meta nas tabelas (AD_GRUPOSPRODUSU e AD_GRUPROSPRODMETVEN)
+Nos vendedores: Ao escolher o mesmo gerente, apagar os vendedores e regravar.
+Nos vendedores: Add total de todas as vendas por vendedor
+Para o grupo de cada vendedor: % dos grupos pelo % de venda dos vendedores
