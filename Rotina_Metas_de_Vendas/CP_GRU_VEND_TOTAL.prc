@@ -44,6 +44,8 @@ CREATE OR REPLACE PROCEDURE TOTALPRD."CP_GRU_VEND_TOTAL" (
        AD_METEMPGRUSUBGRUPK INT;
        AD_GRUMETEMPDIAPK INT;
        AD_METEMPGRUSUBGRUVENPK INT;
+       teste float;
+       teste2 float;
 BEGIN
 
 /*
@@ -1117,6 +1119,11 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                         GROUP BY CAB.CODVEND, CAB.CODEMP, ADA.CODGRUPOPROD, CAB.CODVEND, TO_CHAR(TRUNC(CAB.DTFATUR), 'd'), TRUNC(CAB.DTFATUR)
                                         ORDER BY 3) A)
                         LOOP
+                        teste := (IVENDDIAGRU.TOTAL) + (((IVENDDIAGRU.TOTAL) / 100) * IEMP.PER);
+                        teste2 := IVEND.TOTAL + ((IVEND.TOTAL / 100) * IEMP.PER);
+--RAISE_APPLICATION_ERROR(-20001, '<font size="0" color="#FFFFFF"><br><br><br><b><font size="12" color="#000000">
+--menor (' || to_char(teste) || ') -- (' || to_char(FIELD_ID) || ')IEMP.IDMETEMP(' || to_char(IEMP.IDMETEMP) || ')IEMPVEND(' || to_char(IEMPVEND) || ')TOTALZAO(' || to_char(teste2) || ').</font></b><br><font>');
+                        
                             SELECT COUNT(*)
                             INTO IVENDDIAGRUPK
                             FROM AD_EMPVENDIAGRU AD
@@ -1126,10 +1133,11 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
 
                             IF IVENDDIAGRUPK = 0 THEN
                                 IVENDDIAGRUPK := 1;
-                                INSERT INTO AD_EMPVENDIAGRU (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA) VALUES
+                                INSERT INTO AD_EMPVENDIAGRU (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA, TOTALZAO) VALUES
                                 (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, IVENDDIAGRU.CODEMP, IVENDDIAGRU.CODVEND, IVENDDIAGRU.GRUPO, IVENDDIAGRU.TOTAL, (IVENDDIAGRU.TOTAL / IVENDDIAGRU.TOTALZAO) * 100
                                 , (IVENDDIAGRU.TOTAL) + (((IVENDDIAGRU.TOTAL) / 100) * IEMP.PER)
-                                , IVENDDIAGRU.FATUR);
+                                , IVENDDIAGRU.FATUR
+                                , (((IVENDDIAGRU.TOTAL) + (((IVENDDIAGRU.TOTAL) / 100) * IEMP.PER)) / (IVEND.TOTAL + ((IVEND.TOTAL / 100) * IEMP.PER))) * 100);
                                 
                             ELSE
                             
@@ -1140,10 +1148,11 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                   AND AD.IDMETEMP = IEMP.IDMETEMP
                                   AND AD.IDEMPVEND = IEMPVEND;
                             
-                                INSERT INTO AD_EMPVENDIAGRU (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA) VALUES
+                                INSERT INTO AD_EMPVENDIAGRU (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA, TOTALZAO) VALUES
                                 (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, IVENDDIAGRU.CODEMP, IVENDDIAGRU.CODVEND, IVENDDIAGRU.GRUPO, IVENDDIAGRU.TOTAL, (IVENDDIAGRU.TOTAL / IVENDDIAGRU.TOTALZAO) * 100
                                 , (IVENDDIAGRU.TOTAL) + (((IVENDDIAGRU.TOTAL) / 100) * IEMP.PER)
-                                , IVENDDIAGRU.FATUR);
+                                , IVENDDIAGRU.FATUR
+                                , (((IVENDDIAGRU.TOTAL) + (((IVENDDIAGRU.TOTAL) / 100) * IEMP.PER)) / (IVEND.TOTAL + ((IVEND.TOTAL / 100) * IEMP.PER))) * 100); -- (IVENDDIAGRU.TOTAL) + (((IVENDDIAGRU.TOTAL) / 100) * IEMP.PER) / IVEND.TOTAL + 
                             END IF;
     ------------------------------------------------------------------------------------------------------------------------------------------------------------
     --INSERE FILHOS DOS GRUPOS DOS VENDEDORES DAS EMPRESAS NOVO (GRUPO - FILHO)
