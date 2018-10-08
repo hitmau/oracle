@@ -993,9 +993,11 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                       AND AD.IDMETEMP = IEMP.IDMETEMP;
                       
                     IF IEMPVEND = 0 THEN
-                        INSERT INTO AD_EMPVEND (ID, IDMETEMP, IDEMPVEND, CODEMP, CODVEND, VLR, PESO, META) VALUES
-                        (FIELD_ID, IEMP.IDMETEMP, 1,  IEMP.CODEMP, IVEND.CODVEND, IVEND.TOTAL, (IVEND.TOTAL / IVEND.TOTALZAO) * 100, IVEND.TOTAL + ((IVEND.TOTAL / 100) * ((IVEND.TOTAL / IEMP.META) * 100)));
                         IEMPVEND := 1;
+                        INSERT INTO AD_EMPVEND (ID, IDMETEMP, IDEMPVEND, CODEMP, CODVEND, VLR, PESO, META) VALUES
+                        --(FIELD_ID, IEMP.IDMETEMP, IEMPVEND,  IEMP.CODEMP, IVEND.CODVEND, IVEND.TOTAL, ((IVEND.TOTAL / IVEND.TOTALZAO) * 100), (IEMP.META / 100) * ((IVEND.TOTAL / IVEND.TOTALZAO) * 100));
+                        (FIELD_ID, IEMP.IDMETEMP, IEMPVEND,  IEMP.CODEMP, IVEND.CODVEND, IVEND.TOTAL, (IVEND.TOTAL / IVEND.TOTALZAO) * 100, IVEND.TOTAL + ((IVEND.TOTAL / 100) * IEMP.PER));
+                        
                     ELSE
                     
                         SELECT MAX(IDEMPVEND) + 1
@@ -1005,9 +1007,9 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                           AND AD.IDMETEMP = IEMP.IDMETEMP;
                     
                         INSERT INTO AD_EMPVEND (ID, IDMETEMP, IDEMPVEND, CODEMP, CODVEND, VLR, PESO, META) VALUES
-                        (FIELD_ID, IEMP.IDMETEMP, IEMPVEND,  IEMP.CODEMP, IVEND.CODVEND, IVEND.TOTAL, (IVEND.TOTAL / IVEND.TOTALZAO) * 100, IVEND.TOTAL + ((IVEND.TOTAL / 100) * ((IVEND.TOTAL / IEMP.META) * 100)));
+                        (FIELD_ID, IEMP.IDMETEMP, IEMPVEND,  IEMP.CODEMP, IVEND.CODVEND, IVEND.TOTAL, (IVEND.TOTAL / IVEND.TOTALZAO) * 100, IVEND.TOTAL + ((IVEND.TOTAL / 100) * IEMP.PER));
                     END IF;
-                    
+                    --
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 --INICIA DISTRIGUIÇÃO POR DIA NAS EMPRESAS
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1123,9 +1125,12 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                               AND AD.IDEMPVEND = IEMPVEND;
 
                             IF IVENDDIAGRUPK = 0 THEN
-                                INSERT INTO AD_EMPVENDIAGRU (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA) VALUES
-                                (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, 1, IVENDDIAGRU.CODEMP, IVENDDIAGRU.CODVEND, IVENDDIAGRU.GRUPO, IVENDDIAGRU.TOTAL, (IVENDDIAGRU.TOTAL / IVENDDIAGRU.TOTALZAO) * 100 ,IVENDDIAGRU.META, IVENDDIAGRU.FATUR);
                                 IVENDDIAGRUPK := 1;
+                                INSERT INTO AD_EMPVENDIAGRU (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA) VALUES
+                                (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, IVENDDIAGRU.CODEMP, IVENDDIAGRU.CODVEND, IVENDDIAGRU.GRUPO, IVENDDIAGRU.TOTAL, (IVENDDIAGRU.TOTAL / IVENDDIAGRU.TOTALZAO) * 100
+                                , (IVENDDIAGRU.TOTAL) + (((IVENDDIAGRU.TOTAL) / 100) * IEMP.PER)
+                                , IVENDDIAGRU.FATUR);
+                                
                             ELSE
                             
                                 SELECT MAX(IDEMPVENDIA) + 1
@@ -1136,7 +1141,9 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                   AND AD.IDEMPVEND = IEMPVEND;
                             
                                 INSERT INTO AD_EMPVENDIAGRU (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA) VALUES
-                                (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, IVENDDIAGRU.CODEMP, IVENDDIAGRU.CODVEND, IVENDDIAGRU.GRUPO, IVENDDIAGRU.TOTAL, (IVENDDIAGRU.TOTAL / IVENDDIAGRU.TOTALZAO) * 100 ,IVENDDIAGRU.META, IVENDDIAGRU.FATUR);
+                                (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, IVENDDIAGRU.CODEMP, IVENDDIAGRU.CODVEND, IVENDDIAGRU.GRUPO, IVENDDIAGRU.TOTAL, (IVENDDIAGRU.TOTAL / IVENDDIAGRU.TOTALZAO) * 100
+                                , (IVENDDIAGRU.TOTAL) + (((IVENDDIAGRU.TOTAL) / 100) * IEMP.PER)
+                                , IVENDDIAGRU.FATUR);
                             END IF;
     ------------------------------------------------------------------------------------------------------------------------------------------------------------
     --INSERE FILHOS DOS GRUPOS DOS VENDEDORES DAS EMPRESAS NOVO (GRUPO - FILHO)
@@ -1224,9 +1231,12 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                   AND AD.IDEMPVENDIA = IVENDDIAGRUPK;
                                                  
                                 IF EMPVENGRUGRUFIK = 0 THEN
-                                    INSERT INTO AD_EMPVENGRUGRUF (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, IDEMPGRUGRU, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA) VALUES
-                                    (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, 1, IGRUVENFI2.CODEMP, IGRUVENFI2.CODVEND, IGRUVENFI2.GRUPO, IGRUVENFI2.TOTAL, (IGRUVENFI2.TOTAL / IVENDDIAGRU.TOTAL) * 100, IGRUVENFI2.TOTAL, IGRUVENFI2.FATUR); 
                                     EMPVENGRUGRUFIK := 1;
+                                    INSERT INTO AD_EMPVENGRUGRUF (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, IDEMPGRUGRU, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA) VALUES
+                                    (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, EMPVENGRUGRUFIK, IGRUVENFI2.CODEMP, IGRUVENFI2.CODVEND, IGRUVENFI2.GRUPO, IGRUVENFI2.TOTAL, (IGRUVENFI2.TOTAL / IVENDDIAGRU.TOTAL) * 100
+                                    , IGRUVENFI2.TOTAL + ((IGRUVENFI2.TOTAL / 100) * IEMP.PER)
+                                    , IGRUVENFI2.FATUR); 
+                                    
                                 ELSE
                                 
                                     SELECT MAX(IDEMPGRUGRU) + 1
@@ -1238,7 +1248,9 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                       AND AD.IDEMPVENDIA = IVENDDIAGRUPK;  
                                                               
                                     INSERT INTO AD_EMPVENGRUGRUF (ID, IDMETEMP, IDEMPVEND, IDEMPVENDIA, IDEMPGRUGRU, CODEMP, CODVEND, CODGRUPOPROD, VLR, PESO, META, DATA) VALUES
-                                    (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, EMPVENGRUGRUFIK, IGRUVENFI2.CODEMP, IGRUVENFI2.CODVEND, IGRUVENFI2.GRUPO, IGRUVENFI2.TOTAL, (IGRUVENFI2.TOTAL / IVENDDIAGRU.TOTAL) * 100, IGRUVENFI2.TOTAL, IGRUVENFI2.FATUR); 
+                                    (FIELD_ID, IEMP.IDMETEMP, IEMPVEND, IVENDDIAGRUPK, EMPVENGRUGRUFIK, IGRUVENFI2.CODEMP, IGRUVENFI2.CODVEND, IGRUVENFI2.GRUPO, IGRUVENFI2.TOTAL, (IGRUVENFI2.TOTAL / IVENDDIAGRU.TOTAL) * 100
+                                    , IGRUVENFI2.TOTAL + ((IGRUVENFI2.TOTAL / 100) * IEMP.PER)
+                                    , IGRUVENFI2.FATUR); 
                                 END IF;
                             END LOOP; --INSERE FILHOS DOS GRUPOS DOS VENDEDORES DAS EMPRESAS NOVO
                         END LOOP;
@@ -1705,8 +1717,9 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                     
                                     IF AD_METEMPGRUSUBGRUVENPK = 0 THEN
                                     AD_METEMPGRUSUBGRUVENPK := 1;
-                                        INSERT INTO AD_METEMPGRUSUBGRUVEN (ID, IDMETEMP, IDGRUMETDIA, IDEMPGRUFI, IDVENDGRUFI, CODGRUPOPROD, VLR, CODEMP, DATA, CODVEND, PESO) VALUES
-                                        (FIELD_ID, IEMP.IDMETEMP, IGRUFI.IDGRUMETDIA, AD_METEMPGRUSUBGRUPK,AD_METEMPGRUSUBGRUVENPK, IGRUFIVEND.GRUPO, IGRUFIVEND.TOTAL, IEMP.CODEMP, IGRUFIVEND.FATUR, IGRUFIVEND.CODVEND, (IGRUFIVEND.TOTAL/IGRUFIVEND.TOTALZAO)*100);
+                                        INSERT INTO AD_METEMPGRUSUBGRUVEN (ID, IDMETEMP, IDGRUMETDIA, IDEMPGRUFI, IDVENDGRUFI, CODGRUPOPROD, VLR, CODEMP, DATA, CODVEND, PESO, META) VALUES
+                                        (FIELD_ID, IEMP.IDMETEMP, IGRUFI.IDGRUMETDIA, AD_METEMPGRUSUBGRUPK,AD_METEMPGRUSUBGRUVENPK, IGRUFIVEND.GRUPO, IGRUFIVEND.TOTAL, IEMP.CODEMP, IGRUFIVEND.FATUR, IGRUFIVEND.CODVEND, (IGRUFIVEND.TOTAL/IGRUFIVEND.TOTALZAO)*100,
+                                        (((IEMPDIAS.META / 100) * (IGRUFI.TOTAL / IGRUFI.TOTALZAO)*100) / 100) * ((IGRUFIVEND.TOTAL/IGRUFIVEND.TOTALZAO)*100));
                                          
                                     ELSE
                                     
@@ -1718,8 +1731,9 @@ Favor inserir Empresas(s) na aba "Metas por empresa".</font></b><br><font>');
                                         AND AD.IDGRUMETDIA = IGRUFI.IDGRUMETDIA
                                         AND AD.IDEMPGRUFI = AD_METEMPGRUSUBGRUPK;
         
-                                        INSERT INTO AD_METEMPGRUSUBGRUVEN (ID, IDMETEMP, IDGRUMETDIA, IDEMPGRUFI, IDVENDGRUFI, CODGRUPOPROD, VLR, CODEMP, DATA, CODVEND, PESO) VALUES
-                                        (FIELD_ID, IEMP.IDMETEMP, IGRUFI.IDGRUMETDIA, AD_METEMPGRUSUBGRUPK ,AD_METEMPGRUSUBGRUVENPK , IGRUFIVEND.GRUPO, IGRUFIVEND.TOTAL, IEMP.CODEMP, IGRUFIVEND.FATUR, IGRUFIVEND.CODVEND, (IGRUFIVEND.TOTAL/IGRUFIVEND.TOTALZAO)*100);
+                                        INSERT INTO AD_METEMPGRUSUBGRUVEN (ID, IDMETEMP, IDGRUMETDIA, IDEMPGRUFI, IDVENDGRUFI, CODGRUPOPROD, VLR, CODEMP, DATA, CODVEND, PESO, META) VALUES
+                                        (FIELD_ID, IEMP.IDMETEMP, IGRUFI.IDGRUMETDIA, AD_METEMPGRUSUBGRUPK ,AD_METEMPGRUSUBGRUVENPK , IGRUFIVEND.GRUPO, IGRUFIVEND.TOTAL, IEMP.CODEMP, IGRUFIVEND.FATUR, IGRUFIVEND.CODVEND, (IGRUFIVEND.TOTAL/IGRUFIVEND.TOTALZAO)*100,
+                                        (((IEMPDIAS.META / 100) * (IGRUFI.TOTAL / IGRUFI.TOTALZAO)*100) / 100) * ((IGRUFIVEND.TOTAL/IGRUFIVEND.TOTALZAO)*100));
                                     END IF;
                                 END LOOP; --INSERE OS VENDEDORES COM GRUPOS FILHOS                       
                             END LOOP; --INSERE OS GRUPOS FILHOS DOS GRUPOS PAI DA EMPRESA
