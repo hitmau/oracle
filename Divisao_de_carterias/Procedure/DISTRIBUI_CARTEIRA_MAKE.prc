@@ -17,15 +17,16 @@ CREATE OR REPLACE PROCEDURE TOTALPRD."DISTRIBUI_CARTEIRA_MAKE" (
        TEXTMSG VARCHAR(4000);
        PK_RESTOR INT;
        LOGVENDE VARCHAR(4000);
+       VENDATIVO CHAR;
 BEGIN
 /*
     AUTOR: Mauricio Rodrigues
     Data da criação: 16/08/2018
     Descrição: Divisão de carterias da distribuição, com base nos parceiros da curva abs + regiões + ativos/inativos/novos.
-	teste testelkajsdlfk asdf 
 */
 --A TRIGGER ABAIXO IMPEDE DE ATUALIZAR O PARCEIRO CASO O CADASTRO ESTEJA ERRADO.
-EXECUTE IMMEDIATE 'ALTER TRIGGER TOTALPRD.TRG_UPD_TGFPAR_TOTAL DISABLE';
+EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_UPD_TGFPAR_TOTAL DISABLE';
+                                          
 
        -- Os valores informados pelo formulário de parâmetros, podem ser obtidos com as funções:
        --     ACT_INT_PARAM
@@ -106,9 +107,22 @@ ELSE
                     INSERT INTO AD_LOGDISTCARTEIRA (ID, DTHRALTER, CODPARC, CODVENDANTIGO, CODVENDNOVO, CODUSU, TIPO, CODREG, RESTOR) 
                          VALUES ((SELECT MAX(ID) +1 FROM AD_LOGDISTCARTEIRA), SYSDATE, PINATIVO.CODPARC, PINATIVO.CODVEND, FIELD_CODVEND, P_CODUSU, 'I', PINATIVO.REG, PK_RESTOR);
  
---              ATUALIZA OS PARCEIROS ENCONTRADOS
+
+                    SELECT VEN.ATIVO
+                    INTO VENDATIVO
+                    FROM TGFVEN VEN
+                    WHERE VEN.CODVEND = FIELD_CODVEND;
+                    IF NVL(VENDATIVO,'N') = 'N' THEN
+                        UPDATE TGFVEN VEN SET VEN.ATIVO = 'S' WHERE VEN.CODVEND = FIELD_CODVEND;
+                        VENDATIVO := 'A';
+                    END IF;
+                    --              ATUALIZA OS PARCEIROS ENCONTRADOS
                     UPDATE TGFPAR PAR SET PAR.CODVEND = FIELD_CODVEND WHERE PAR.CODPARC = PINATIVO.CODPARC;
                     
+                    IF VENDATIVO = 'A' THEN
+                        UPDATE TGFVEN VEN SET VEN.ATIVO = 'N' WHERE VEN.CODVEND = FIELD_CODVEND;
+                        VENDATIVO := 'B';
+                    END IF;  
                     CONT := CONT + 1;
                     PASSA := PASSA + P_QTDLINHAS;
                 END IF;
@@ -172,8 +186,20 @@ ELSE
                          VALUES ((SELECT MAX(ID) +1 FROM AD_LOGDISTCARTEIRA), SYSDATE, PATIVO.CODPARC, PATIVO.CODVEND, FIELD_CODVEND, P_CODUSU, 'A', PATIVO.REG, PK_RESTOR);
  
 --              ATUALIZA OS PARCEIROS ENCONTRADOS
-                    UPDATE TGFPAR PAR SET PAR.CODVEND = FIELD_CODVEND WHERE PAR.CODPARC = PATIVO.CODPARC;
+                    SELECT VEN.ATIVO
+                    INTO VENDATIVO
+                    FROM TGFVEN VEN
+                    WHERE VEN.CODVEND = FIELD_CODVEND;
+                    IF NVL(VENDATIVO,'N') = 'N' THEN
+                        UPDATE TGFVEN VEN SET VEN.ATIVO = 'S' WHERE VEN.CODVEND = FIELD_CODVEND;
+                        VENDATIVO := 'A';
+                    END IF; 
                     
+                    UPDATE TGFPAR PAR SET PAR.CODVEND = FIELD_CODVEND WHERE PAR.CODPARC = PATIVO.CODPARC;
+                    IF VENDATIVO = 'A' THEN
+                        UPDATE TGFVEN VEN SET VEN.ATIVO = 'N' WHERE VEN.CODVEND = FIELD_CODVEND;
+                        VENDATIVO := 'B';
+                    END IF;  
                     CONT := CONT + 1;
                     PASSA := PASSA + P_QTDLINHAS;
                 END IF;
@@ -215,8 +241,24 @@ ELSE
                          VALUES ((SELECT MAX(ID) +1 FROM AD_LOGDISTCARTEIRA), SYSDATE, PNOVO.CODPARC, PNOVO.CODVEND, FIELD_CODVEND, P_CODUSU, 'N', PNOVO.REG, PK_RESTOR);
  
     --              ATUALIZA OS PARCEIROS ENCONTRADOS
+                    
+                    SELECT VEN.ATIVO
+                    INTO VENDATIVO
+                    FROM TGFVEN VEN
+                    WHERE VEN.CODVEND = FIELD_CODVEND;
+                    IF NVL(VENDATIVO,'N') = 'N' THEN
+                        UPDATE TGFVEN VEN SET VEN.ATIVO = 'S' WHERE VEN.CODVEND = FIELD_CODVEND;
+                        VENDATIVO := 'A';
+                    END IF;
+                    
                     UPDATE TGFPAR PAR SET PAR.CODVEND = FIELD_CODVEND WHERE PAR.CODPARC = PNOVO.CODPARC;
-                        
+                    
+                    IF VENDATIVO = 'A' THEN
+                        UPDATE TGFVEN VEN SET VEN.ATIVO = 'N' WHERE VEN.CODVEND = FIELD_CODVEND;
+                        VENDATIVO := 'B';
+                    END IF;    
+                    
+                    
                     CONT := CONT + 1;
                     PASSA := PASSA + P_QTDLINHAS;
                 END IF;
@@ -231,7 +273,7 @@ ELSE
        END LOOP;
 
 END IF; 
-EXECUTE IMMEDIATE 'ALTER TRIGGER TOTALPRD.TRG_UPD_TGFPAR_TOTAL ENABLE';
+EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_UPD_TGFPAR_TOTAL ENABLE';
 
 P_MENSAGEM := TEXTMSG;
 
