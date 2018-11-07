@@ -533,8 +533,8 @@ BEGIN
                                       AND CAB.STATUSNFE = 'A'
                                       AND VE.ATIVO = 'S'
                                             AND CAB.CODVEND = VEN.CODVEND
-                                            AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),0),'MONTH'),'DD/MM/YY'),-1)
-                                                                       AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-1)),0) 
+                                            AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI
+                                                                       AND PDTFIN),0) 
                                                 AS VALOR
                                         , (SELECT SUM( ((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI) * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV )
                                     FROM TGFCAB CAB INNER JOIN TGFITE ITE ON (CAB.NUNOTA = ITE.NUNOTA)
@@ -545,8 +545,8 @@ BEGIN
                                       AND CAB.STATUSNFE = 'A'
                                       AND VE.ATIVO = 'S'
                                              AND CAB.CODVEND IN (SELECT CODVEND FROM AD_GRUPROSPRODMETVEN WHERE ID = FIELD_ID)
-                                             AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),0),'MONTH'),'DD/MM/YY'),-1)
-                                                                            AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-1)) 
+                                             AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI
+                                                                            AND PDTFIN) 
                                                 AS TOTAL
                     FROM TGFVEN VEN INNER JOIN AD_GRUPROSPRODMETVEN AD ON (VEN.CODVEND = AD.CODVEND))
                     ORDER BY PERC, CODVEND)
@@ -590,12 +590,12 @@ BEGIN
                                                         AND CAB.STATUSNFE = 'A'
                                                         AND VE.ATIVO = 'S'
                                                         AND CAB.CODVEND = VEN.CODVEND
-                                                        AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),0),'MONTH'),'DD/MM/YY'),-1)
-                                                                                          AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-1)),0) ) <> 0
+                                                        AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI
+                                                                                          AND PDTFIN),0) ) <> 0
                                                         --FIM DO VENDEDOR COM 0 DE VENDA 
                                                         AND CAB.CODVEND = VEN.CODVEND
-                                                        AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),0),'MONTH'),'DD/MM/YY'),-1)
-                                                                                    AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-1)),0) 
+                                                        AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI
+                                                                                    AND PDTFIN),0) 
                                         AS VALOR
                                     , (SELECT SUM( ((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI) * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV )
                                        FROM TGFCAB CAB INNER JOIN TGFITE ITE ON (CAB.NUNOTA = ITE.NUNOTA)
@@ -606,8 +606,7 @@ BEGIN
                                          AND CAB.STATUSNFE = 'A'
                                          AND VE.ATIVO = 'S'
                                           AND CAB.CODVEND IN (SELECT VEN.CODVEND FROM TGFVEN VEN WHERE CODGER = PARAM_CODGER)
-                                          AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),0),'MONTH'),'DD/MM/YY'),-1)
-                                                                                 AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-1)) 
+                                          AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI AND PDTINI) 
                                         AS TOTAL
                          FROM TGFVEN VEN 
                          WHERE CODGER = PARAM_CODGER)
@@ -633,8 +632,10 @@ BEGIN
             INTO CONT
             FROM AD_GRUPROSPRODMETVEN AD
             WHERE AD.ID = FIELD_ID;
-                    
+             --filhos        
             DELETE FROM AD_SUBGRUPOVENDMET AD WHERE AD.ID = FIELD_ID;
+             --filhos
+            DELETE FROM AD_SUBGRUPOVENDMETDIAS AD WHERE AD.ID = FIELD_ID;
             
             DELETE FROM  AD_GRUPROSPRODMETVEN A WHERE A.ID = FIELD_ID AND NVL(A.CODGRUPO, PARAM_CODGRU) = PARAM_CODGRU;
                
@@ -656,9 +657,7 @@ BEGIN
                                         AND VE.ATIVO = 'S'
                                         AND CAB.CODVEND NOT IN (0, 76)
                                         AND CAB.CODVEND = VEN.CODVEND -- 75, 57< o grupo dos usuários
-                                        AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),0),'MONTH'),'DD/MM/YY'),-1)
-                                                                       AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-1)),0 
-                                          ) AS VALOR
+                                        AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI AND PDTFIN),0) AS VALOR
                                    , (SELECT SUM( ((ITE.VLRTOT - ITE.VLRDESC - ITE.VLRREPRED + ITE.VLRSUBST + ITE.VLRIPI) * VCA.INDITENSBRUTO) * CASE WHEN TOP.BONIFICACAO = 'S' THEN 0 ELSE 1 END * TOP.GOLDEV )
                                       FROM TGFCAB CAB INNER JOIN TGFITE ITE ON (CAB.NUNOTA = ITE.NUNOTA)
                                                       INNER JOIN VGFCAB VCA ON (CAB.NUNOTA = VCA.NUNOTA)
@@ -669,8 +668,7 @@ BEGIN
                                         AND VE.ATIVO = 'S'
                                         AND CAB.CODVEND NOT IN (0, 76)
                                         AND CAB.CODVEND IN (SELECT USU.CODVEND FROM TSIUSU USU WHERE USU.CODGRUPO = PARAM_CODGRU AND USU.DTULTACESSO IS NOT NULL) -- < o grupo dos usuários
-                                        AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),0),'MONTH'),'DD/MM/YY'),-1)
-                                                                       AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-1)
+                                        AND TRUNC(CAB.DTFATUR) BETWEEN PDTINI AND PDTFIN
                                           ) AS TOTAL
                                FROM TGFVEN VEN 
                                WHERE VEN.CODVEND IN (SELECT USU.CODVEND FROM TSIUSU USU WHERE USU.CODGRUPO = PARAM_CODGRU) -- < o grupo dos usuários
@@ -685,8 +683,7 @@ BEGIN
                                          AND CAB.STATUSNFE = 'A'
                                          AND VE.ATIVO = 'S'
                                          AND CAB.CODVEND = VEN.CODVEND
-                                         AND TRUNC(CAB.DTFATUR) BETWEEN ADD_MONTHS (TO_DATE (TRUNC (ADD_MONTHS (TO_DATE (TRUNC (TO_DATE(SYSDATE, 'DD/MM/YYYY'),'MONTH'),'DD/MM/YY'),0),'MONTH'),'DD/MM/YY'),-1)
-                                                                    AND ADD_MONTHS (TO_DATE (LAST_DAY (TO_DATE(SYSDATE, 'DD/MM/YYYY')),'DD/MM/YY'),-1)),0) ) <> 0
+                                         AND TRUNC(CAB.DTFATUR) BETWEEN  PDTINI AND PDTFIN),0) ) <> 0
                                          --FIM DO VENDEDOR COM 0 DE VENDA 
                                          AND VEN.CODVEND NOT IN (0, 76))
                          ORDER BY PERC, CODVEND)
