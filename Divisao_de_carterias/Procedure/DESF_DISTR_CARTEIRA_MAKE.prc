@@ -26,7 +26,7 @@ BEGIN
        FROM AD_LOGDISTCARTEIRA;
        
        PARAM_DIALT := ACT_INT_PARAM(P_IDSESSAO, 'DIALT');
-       PARAM_MOMENTO := NVL(ACT_TXT_PARAM(P_IDSESSAO, 'MOMENTO'), 'N'); --U=ULTIMO / P=PENULTIMO / A=ANTIPENULTIMO
+       PARAM_MOMENTO := NVL(ACT_TXT_PARAM(P_IDSESSAO, 'MOMENTO'), 'N');
        PARAM_ALTDATA := NVL(ACT_TXT_PARAM(P_IDSESSAO, 'ULTDATA'), 'N');
 
 --RAISE_APPLICATION_ERROR(-20101, 
@@ -82,10 +82,19 @@ EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_UPD_TGFPAR_TOTAL DISABLE';
 --SE FOR PELO MOMENTO--------------------------------------------------------------------------------------------
     ELSIF PARAM_MOMENTO <> 'N' THEN --U=ULTIMO / P=PENULTIMO / A=ANTIPENULTIMO
         IF PARAM_MOMENTO = 'U' THEN     
-            FOR IULTIMO IN (SELECT AD.DTHRALTER, AD.CODPARC, AD.CODVENDANTIGO, AD.RESTOR, AD.CODREG, AD.TIPO
-                            FROM AD_LOGDISTCARTEIRA AD 
-                            WHERE AD.TIPO <> 'D' AND RESTOR = (SELECT MAX(A.RESTOR)
-                                                               FROM AD_LOGDISTCARTEIRA A))
+            FOR IULTIMO IN (SELECT AD.DTHRALTER, AD.CODPARC, AD.CODVENDANTIGO, AD.RESTOR, AD.CODREG, AD.TIPO 
+                             FROM AD_LOGDISTCARTEIRA AD 
+                             WHERE AD.TIPO <> 'D' AND AD.RESTOR = (SELECT RESTOR
+                                                                FROM
+                                                                    (SELECT ROW_NUMBER() OVER(ORDER BY 123 ASC) AS RowSD
+                                                                        , RESTOR
+                                                                     FROM (                                        
+                                                                            SELECT DISTINCT AD.RESTOR
+                                                                            FROM AD_LOGDISTCARTEIRA AD
+                                                                            WHERE AD.RESTOR IS NOT NULL
+                                                                                AND AD.TIPO <> 'D'
+                                                                            ORDER BY 1 DESC))
+                                                                    WHERE ROWSD = 1))
             LOOP
                     SELECT VEN.ATIVO
                     INTO VENDATIVO
@@ -111,9 +120,18 @@ EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_UPD_TGFPAR_TOTAL DISABLE';
         PMSG := 'Desfeita última atualização!';                   
         ELSIF PARAM_MOMENTO = 'P' THEN
             FOR IPENULTIMO IN (SELECT AD.DTHRALTER, AD.CODPARC, AD.CODVENDANTIGO, AD.RESTOR, AD.CODREG, AD.TIPO 
-                               FROM AD_LOGDISTCARTEIRA AD 
-                               WHERE AD.TIPO <> 'D' AND RESTOR = (SELECT MAX(A.RESTOR) -1
-                                                                  FROM AD_LOGDISTCARTEIRA A))
+                             FROM AD_LOGDISTCARTEIRA AD 
+                             WHERE AD.TIPO <> 'D' AND AD.RESTOR = (SELECT RESTOR
+                                                                FROM
+                                                                    (SELECT ROW_NUMBER() OVER(ORDER BY 123 ASC) AS RowSD
+                                                                        , RESTOR
+                                                                     FROM (                                        
+                                                                            SELECT DISTINCT AD.RESTOR
+                                                                            FROM AD_LOGDISTCARTEIRA AD
+                                                                            WHERE AD.RESTOR IS NOT NULL
+                                                                                AND AD.TIPO <> 'D'
+                                                                            ORDER BY 1 DESC))
+                                                                    WHERE ROWSD = 2))
             LOOP
             
                     SELECT VEN.ATIVO
@@ -139,10 +157,19 @@ EXECUTE IMMEDIATE 'ALTER TRIGGER TRG_UPD_TGFPAR_TOTAL DISABLE';
             END LOOP;
         PMSG := 'Desfeita penúltima atualização!';    
         ELSIF PARAM_MOMENTO = 'A' THEN
-            FOR IANTIPENULTIMO IN (SELECT AD.DTHRALTER, AD.CODPARC, AD.CODVENDANTIGO, AD.RESTOR, AD.CODREG, AD.TIPO
-                                   FROM AD_LOGDISTCARTEIRA AD 
-                                   WHERE AD.TIPO <> 'D' AND RESTOR = (SELECT MAX(A.RESTOR) -2
-                                                                      FROM AD_LOGDISTCARTEIRA A))
+            FOR IANTIPENULTIMO IN (SELECT AD.DTHRALTER, AD.CODPARC, AD.CODVENDANTIGO, AD.RESTOR, AD.CODREG, AD.TIPO 
+                             FROM AD_LOGDISTCARTEIRA AD 
+                             WHERE AD.TIPO <> 'D' AND AD.RESTOR = (SELECT RESTOR
+                                                                FROM
+                                                                    (SELECT ROW_NUMBER() OVER(ORDER BY 123 ASC) AS RowSD
+                                                                        , RESTOR
+                                                                     FROM (                                        
+                                                                            SELECT DISTINCT AD.RESTOR
+                                                                            FROM AD_LOGDISTCARTEIRA AD
+                                                                            WHERE AD.RESTOR IS NOT NULL
+                                                                                AND AD.TIPO <> 'D'
+                                                                            ORDER BY 1 DESC))
+                                                                    WHERE ROWSD = 3))
             LOOP
             
                     SELECT VEN.ATIVO
