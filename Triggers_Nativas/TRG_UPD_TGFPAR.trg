@@ -1,0 +1,177 @@
+DROP TRIGGER TOTALPRD.TRG_UPD_TGFPAR;
+
+CREATE OR REPLACE TRIGGER TOTALPRD.TRG_UPD_TGFPAR 
+BEFORE UPDATE ON TOTALPRD.TGFPAR FOR EACH ROW
+DECLARE
+    P_COUNT                  INT:= 0;
+    ERROR                    EXCEPTION;
+    ERRMSG                   VARCHAR2(255);
+    P_VALCTA                 CHAR(1);
+    P_VALIDAR                BOOLEAN;
+    P_VALTAB                 CHAR(1); 
+BEGIN
+
+  IF :NEW.CODTAB IS NOT NULL AND :NEW.CODTAB <> :OLD.CODTAB THEN
+  
+    BEGIN
+      SELECT ATIVO INTO P_VALTAB
+      FROM TGFNTA 
+      WHERE CODTAB = :NEW.CODTAB;
+    EXCEPTION WHEN NO_DATA_FOUND THEN
+      P_VALTAB := 'N';
+    END; 
+    
+    IF P_VALTAB = 'N' THEN
+        ERRMSG := 'A tabela de preço não existe ou não está ativa.';
+        RAISE ERROR;
+    END IF;    
+  END IF; 
+  
+  BEGIN
+
+    IF STP_GET_ATUALIZANDO THEN
+      RETURN;
+    END IF;
+    
+    IF (NVL(:NEW.CODENQIPIENT, 0) <> NVL(:OLD.CODENQIPIENT, 0) OR NVL(:NEW.CSTIPIENT, 0) <> NVL(:OLD.CSTIPIENT, 0)) THEN
+      STP_VALIDA_ENQUADRAMENTO_IPI(:NEW.CSTIPIENT, :NEW.CODENQIPIENT);
+    END IF;
+      
+    IF (NVL(:NEW.CODENQIPISAI, 0) <> NVL(:OLD.CODENQIPISAI, 0) OR NVL(:NEW.CSTIPISAI, 0) <> NVL(:OLD.CSTIPISAI, 0)) THEN
+      STP_VALIDA_ENQUADRAMENTO_IPI(:NEW.CSTIPISAI, :NEW.CODENQIPISAI);
+    END IF;       
+    
+    P_VALIDAR := Fpodevalidar('TGFPAR');
+    IF (NOT P_VALIDAR) THEN
+      RETURN;
+    END IF;
+    
+    SELECT LOGICO INTO P_VALCTA
+      FROM TSIPAR 
+      WHERE CHAVE = 'VALCTA';
+    EXCEPTION WHEN NO_DATA_FOUND THEN
+      P_VALCTA := 'N';
+  END;
+  
+  IF (UPDATING('CODCID') AND (:NEW.CODCID = 0)) THEN
+     ERRMSG := 'A cidade do parceiro não pode ser zero(0)';
+     RAISE ERROR;
+  END IF;
+  
+  IF (P_VALCTA = 'S') THEN
+    IF (:NEW.CODCTACTB <> :OLD.CODCTACTB) AND (:NEW.CODCTACTB IS NOT NULL) THEN
+       SELECT COUNT(1) INTO P_COUNT
+         FROM TCBPLA
+        WHERE CODCTACTB = :NEW.CODCTACTB
+          AND ATIVA = 'S'
+          AND ANALITICA = 'S';
+       IF (P_COUNT = 0) THEN
+          ERRMSG := Erros_Pkg.ERRO_CTACTB_ATIV_ANALI_EXIST;
+          RAISE ERROR;
+       END IF;
+    END IF;
+    
+    IF (:NEW.CODCTACTB2 <> :OLD.CODCTACTB2) AND (:NEW.CODCTACTB2 IS NOT NULL) THEN
+       SELECT COUNT(1) INTO P_COUNT
+         FROM TCBPLA
+        WHERE CODCTACTB = :NEW.CODCTACTB2
+          AND ATIVA = 'S'
+          AND ANALITICA = 'S';
+       IF (P_COUNT = 0) THEN
+          ERRMSG := Erros_Pkg.ERRO_CTACTB2_ATIV_ANALI_EXIST;
+          RAISE ERROR;
+       END IF;
+    END IF;
+    
+    IF (:NEW.CODCTACTB3 <> :OLD.CODCTACTB3) AND (:NEW.CODCTACTB3 IS NOT NULL) THEN
+       SELECT COUNT(1) INTO P_COUNT
+         FROM TCBPLA
+        WHERE CODCTACTB = :NEW.CODCTACTB3
+          AND ATIVA = 'S'
+          AND ANALITICA = 'S';
+       IF (P_COUNT = 0) THEN
+          ERRMSG := Erros_Pkg.ERRO_CTACTB3_ATIV_ANALI_EXIST;
+          RAISE ERROR;
+       END IF;
+    END IF;
+    
+    IF (:NEW.CODCTACTB4 <> :OLD.CODCTACTB4) AND (:NEW.CODCTACTB4 IS NOT NULL) THEN
+       SELECT COUNT(1) INTO P_COUNT
+         FROM TCBPLA
+        WHERE CODCTACTB = :NEW.CODCTACTB4
+          AND ATIVA = 'S'
+          AND ANALITICA = 'S';
+       IF (P_COUNT = 0) THEN
+          ERRMSG := Erros_Pkg.ERRO_CTACTB4_ATIV_ANALI_EXIST;
+          RAISE ERROR;
+       END IF;
+    END IF;  
+  END IF;
+  IF UPDATING('CODTIPPARC') THEN
+     SELECT COUNT(1) INTO P_COUNT
+       FROM TGFTPP
+      WHERE CODTIPPARC = :NEW.CODTIPPARC
+        AND ATIVO = 'S'
+        AND ANALITICO = 'S';
+     IF (P_COUNT = 0) THEN
+        ERRMSG := Erros_Pkg.ERRO_TIPPARC_ATIV_ANALI_EXIST;
+        RAISE ERROR;    
+     END IF;
+  END IF;
+
+  IF UPDATING('CODREG') THEN
+     SELECT COUNT(1) INTO P_COUNT 
+       FROM TSIREG
+      WHERE CODREG = :NEW.CODREG
+        AND ATIVA = 'S' ;
+     IF (P_COUNT = 0) THEN
+        ERRMSG := Erros_Pkg.ERRO_REGIAO_NAOATIVA;
+        RAISE ERROR;      
+     END IF;
+  END IF;
+
+  IF UPDATING('CODVEND') AND (:NEW.CODVEND IS NOT NULL) THEN
+     SELECT COUNT(1) INTO P_COUNT
+       FROM TGFVEN
+      WHERE CODVEND = :NEW.CODVEND
+        AND ATIVO = 'S';
+     IF (P_COUNT = 0) THEN
+        ERRMSG := Erros_Pkg.ERRO_VENDEDOR_NAOATIVO;
+        RAISE ERROR;      
+     END IF;
+  END IF;
+  
+  IF UPDATING('FORNECEDOR') AND (:NEW.FORNECEDOR <> 'S') THEN
+     SELECT COUNT(1) INTO P_COUNT
+       FROM TGFCAB
+     WHERE CODPARC = :NEW.CODPARC 
+        AND TIPMOV IN ('O','C','E');
+     IF (P_COUNT <> 0) THEN
+        ERRMSG := 'Parceiros não podem deixar de ser fornecedores se foram lançados pedidos de compra, compras ou devoluções de compra para eles.';
+        RAISE ERROR;
+     END IF;
+  END IF;
+
+  IF UPDATING('MOTORISTA') AND (:NEW.MOTORISTA <> 'S') THEN
+     SELECT COUNT(1) INTO P_COUNT
+       FROM TGFVEI
+      WHERE CODMOTORISTA = :NEW.CODPARC;
+     IF (P_COUNT <> 0) THEN
+        ERRMSG := 'O Parceiro está sendo referenciado no cadastro de veículos e não pode deixar de ser motorista.';
+        RAISE ERROR;
+     END IF;
+
+     SELECT COUNT(1) INTO P_COUNT
+       FROM TGFCAB
+      WHERE CODMOTORISTA = :NEW.CODPARC; 
+     IF (P_COUNT <> 0) THEN
+        ERRMSG := 'Parceiros não podem deixar de ser motorista se foram feitos lançamentos para eles.';
+        RAISE ERROR;
+     END IF;
+  END IF;
+
+  EXCEPTION
+    WHEN ERROR THEN
+    RAISE_APPLICATION_ERROR(-20101, ERRMSG);
+END;
+/
